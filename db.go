@@ -49,6 +49,9 @@ func createDb() TraDb {
 	replicaId := make([]byte, 16)
 	version := 
 
+	replicaId := make([]byte, 16)
+	version := 1
+
 	for i, _ := range replicaId {
 		replicaId[i] = bytes[rand.Intn(len(bytes))]
 	}
