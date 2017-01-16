@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"time"
+	// "time"
 )
 
 const (
 	TRADB = ".trago.db"
 	bytes = "abcdefghijklmnopqrstuvwxyz1234567890"
+	currentDir = "./"
 )
 
 type TraDb struct {
@@ -21,7 +22,7 @@ type TraDb struct {
 
 type FileState struct {
 	size int
-	mtime time.Time
+	mtime int64
 	// TODO: use a hash as well
 }
 
@@ -47,16 +48,29 @@ func parseDbFile() (TraDb, error) {
 
 func createDb() TraDb {
 	replicaId := make([]byte, 16)
-	version := 
-
-	replicaId := make([]byte, 16)
 	version := 1
 
 	for i, _ := range replicaId {
 		replicaId[i] = bytes[rand.Intn(len(bytes))]
 	}
 
-	return TraDb{}
+	files, err := ioutil.ReadDir(currentDir)
+	checkError(err)
+
+	filemap := make(map[string]FileState)
+	for _, file := range files {
+		fs := FileState{
+			size: int(file.Size()),
+			mtime: file.ModTime().UnixNano(),
+		}
+		filemap[file.Name()] = fs
+	}
+
+	return TraDb{
+		replicaId: string(replicaId),
+		version: version,
+		files: filemap,
+	}
 }
 
 func findFiles(path string) {
