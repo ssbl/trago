@@ -27,7 +27,8 @@ type FileState struct {
 }
 
 func main() {
-	db, _ := parseDbFile()
+	db, err := parseDbFile()
+	checkError(err)
 
 	fmt.Println(db)
 }
@@ -39,8 +40,9 @@ func parseDbFile() (TraDb, error) {
 	if os.IsNotExist(err) {
 		fmt.Println("didn't find .trago.db")
 		tradb = createDb()
+		writeDb(tradb)
 	} else {
-		fmt.Println(err)
+		return tradb, err
 	}
 
 	return tradb, nil
@@ -59,6 +61,9 @@ func createDb() TraDb {
 
 	filemap := make(map[string]FileState)
 	for _, file := range files {
+		if file.IsDir() {
+			continue			// ignore directories for now
+		}
 		fs := FileState{
 			size: int(file.Size()),
 			mtime: file.ModTime().UnixNano(),
