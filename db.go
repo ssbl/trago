@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	// "time"
+	"strings"
 )
 
 const (
@@ -76,6 +76,33 @@ func createDb() TraDb {
 		version: version,
 		files: filemap,
 	}
+}
+
+func writeDb(tradb TraDb) {
+	preamble := fmt.Sprintf(
+		"# replica ID\n%s\n# version\n%d\n# files\n",
+		tradb.replicaId,
+		tradb.version,
+	)
+
+	fileEntries := make([]string, len(tradb.files))
+
+	i := 0
+	for filename, info := range tradb.files {
+		fileEntries[i] = fmt.Sprintf(
+			"%s %d %d",
+			filename,
+			info.size,
+			info.mtime,
+		)
+		i = i+1
+	}
+
+	entryString := strings.Join(fileEntries, "\n")
+	dataToWrite := []byte(preamble + entryString)
+
+	err := ioutil.WriteFile(TRADB, dataToWrite, 0644)
+	checkError(err)
 }
 
 func findFiles(path string) {
