@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"math/rand"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -36,14 +38,64 @@ func main() {
 func parseDbFile() (TraDb, error) {
 	tradb := TraDb{}
 
-	_, err := ioutil.ReadFile(TRADB)
+	dbfile, err := os.Open(TRADB)
 	if os.IsNotExist(err) {
 		fmt.Println("didn't find .trago.db")
 		tradb = createDb()
 		writeDb(tradb)
-	} else {
+		return tradb, nil
+	} else if err != nil {
 		return tradb, err
 	}
+
+	defer dbfile.Close()
+	tradb.files = make(map[string]FileState)
+
+	scanner := bufio.NewScanner(dbfile)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+
+		if strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
+			continue
+		}
+
+		switch (fields[0]) {
+			case "file":
+			    if (len(fields) != 4) {
+					continue
+				}
+
+			    size, err := strconv.Atoi(fields[2])
+			    checkError(err)
+			    mtime, err := strconv.ParseInt(fields[3], 10, 64)
+			    checkError(err)
+
+			    tradb.files[fields[1]] = FileState{
+					size: size,
+					mtime: mtime,
+				}
+			case "version":
+			    if (len(fields) != 2) {
+					continue
+				}
+			    version, err := strconv.Atoi(fields[1])
+			    checkError(err)
+
+			    tradb.version = version
+			case "replica":
+			    if (len(fields) != 2) {
+					continue
+				}
+			    tradb.replicaId = fields[1]
+		}
+	}
+
+	checkError(scanner.Err())
 
 	return tradb, nil
 }
