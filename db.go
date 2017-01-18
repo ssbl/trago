@@ -80,7 +80,7 @@ func createDb() TraDb {
 
 func writeDb(tradb TraDb) {
 	preamble := fmt.Sprintf(
-		"# replica ID\n%s\n# version\n%d\n# files\n",
+		"replica %s\nversion %d\n# files\n",
 		tradb.replicaId,
 		tradb.version,
 	)
@@ -90,7 +90,7 @@ func writeDb(tradb TraDb) {
 	i := 0
 	for filename, info := range tradb.files {
 		fileEntries[i] = fmt.Sprintf(
-			"%s %d %d",
+			"file %s %d %d",
 			filename,
 			info.size,
 			info.mtime,
