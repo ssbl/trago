@@ -76,8 +76,10 @@ func parseDbFile() (TraDb, error) {
 			    checkError(err)
 			    mtime, err := strconv.ParseInt(fields[3], 10, 64)
 			    checkError(err)
+			    ver, err := strconv.Atoi(fields[4])
+			    checkError(err)
 
-			    tradb.files[fields[1]] = FileState{size, mtime, 1}
+			    tradb.files[fields[1]] = FileState{size, mtime, ver}
 			case "version":
 			    for _, entry := range fields[1:] {
 					pair := strings.Split(entry, ":") // replica:version pair
