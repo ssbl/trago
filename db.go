@@ -18,13 +18,14 @@ const (
 
 type TraDb struct {
 	replicaId string
-	version int
+	version map[string]int
 	files map[string]FileState
 }
 
 type FileState struct {
 	size int
 	mtime int64
+	version int
 	// TODO: use a hash as well
 }
 
@@ -37,6 +38,7 @@ func main() {
 
 func parseDbFile() (TraDb, error) {
 	tradb := TraDb{}
+	version := make(map[string]int)
 
 	dbfile, err := os.Open(TRADB)
 	if os.IsNotExist(err) {
@@ -75,17 +77,16 @@ func parseDbFile() (TraDb, error) {
 			    mtime, err := strconv.ParseInt(fields[3], 10, 64)
 			    checkError(err)
 
-			    tradb.files[fields[1]] = FileState{
-					size: size,
-					mtime: mtime,
-				}
+			    tradb.files[fields[1]] = FileState{size, mtime, 1}
 			case "version":
-			    if (len(fields) != 2) {
-					continue
-				}
-			    version, err := strconv.Atoi(fields[1])
-			    checkError(err)
+			    for _, entry := range fields[1:] {
+					pair := strings.Split(entry, ":") // replica:version pair
 
+					v, err := strconv.Atoi(pair[1])
+					checkError(err)
+
+					version[pair[0]] = v
+				}
 			    tradb.version = version
 			case "replica":
 			    if (len(fields) != 2) {
@@ -102,11 +103,12 @@ func parseDbFile() (TraDb, error) {
 
 func createDb() TraDb {
 	replicaId := make([]byte, 16)
-	version := 1
+	version := make(map[string]int)
 
 	for i, _ := range replicaId {
 		replicaId[i] = bytes[rand.Intn(len(bytes))]
 	}
+	version[string(replicaId)] = 1
 
 	files, err := ioutil.ReadDir(currentDir)
 	checkError(err)
@@ -119,22 +121,28 @@ func createDb() TraDb {
 		fs := FileState{
 			size: int(file.Size()),
 			mtime: file.ModTime().UnixNano(),
+			version: 1,
 		}
 		filemap[file.Name()] = fs
 	}
 
-	return TraDb{
-		replicaId: string(replicaId),
-		version: version,
-		files: filemap,
-	}
+	return TraDb{string(replicaId), version, filemap}
 }
 
 func writeDb(tradb TraDb) {
+	var pairs []string
+
+	for replicaId, version := range tradb.version {
+		entry := strings.Join([]string{replicaId, strconv.Itoa(version)}, ":")
+		pairs = append(pairs, entry)
+	}
+
+	versionVector := strings.Join(pairs, " ")
+
 	preamble := fmt.Sprintf(
-		"replica %s\nversion %d\n# files\n",
+		"replica %s\nversion %s\n# files\n",
 		tradb.replicaId,
-		tradb.version,
+		versionVector,
 	)
 
 	fileEntries := make([]string, len(tradb.files))
@@ -142,10 +150,11 @@ func writeDb(tradb TraDb) {
 	i := 0
 	for filename, info := range tradb.files {
 		fileEntries[i] = fmt.Sprintf(
-			"file %s %d %d",
+			"file %s %d %d %d",
 			filename,
 			info.size,
 			info.mtime,
+			info.version,
 		)
 		i = i+1
 	}
