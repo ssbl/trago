@@ -68,7 +68,7 @@ func parseDbFile() (TraDb, error) {
 
 		switch (fields[0]) {
 			case "file":
-			    if (len(fields) != 4) {
+			    if (len(fields) != 5) {
 					continue
 				}
 
