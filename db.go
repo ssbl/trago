@@ -2,29 +2,29 @@ package main
 
 import (
 	"bufio"
-	"math/rand"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"strconv"
 	"strings"
 )
 
 const (
-	TRADB = ".trago.db"
-	bytes = "abcdefghijklmnopqrstuvwxyz1234567890"
+	TRADB      = ".trago.db"
+	bytes      = "abcdefghijklmnopqrstuvwxyz1234567890"
 	currentDir = "./"
 )
 
 type TraDb struct {
 	replicaId string
-	version map[string]int
-	files map[string]FileState
+	version   map[string]int
+	files     map[string]FileState
 }
 
 type FileState struct {
-	size int
-	mtime int64
+	size    int
+	mtime   int64
 	version int
 	// TODO: use a hash as well
 }
@@ -66,35 +66,35 @@ func parseDbFile() (TraDb, error) {
 			continue
 		}
 
-		switch (fields[0]) {
-			case "file":
-			    if (len(fields) != 5) {
-					continue
-				}
+		switch fields[0] {
+		case "file":
+			if len(fields) != 5 {
+				continue
+			}
 
-			    size, err := strconv.Atoi(fields[2])
-			    checkError(err)
-			    mtime, err := strconv.ParseInt(fields[3], 10, 64)
-			    checkError(err)
-			    ver, err := strconv.Atoi(fields[4])
-			    checkError(err)
+			size, err := strconv.Atoi(fields[2])
+			checkError(err)
+			mtime, err := strconv.ParseInt(fields[3], 10, 64)
+			checkError(err)
+			ver, err := strconv.Atoi(fields[4])
+			checkError(err)
 
-			    tradb.files[fields[1]] = FileState{size, mtime, ver}
-			case "version":
-			    for _, entry := range fields[1:] {
-					pair := strings.Split(entry, ":") // replica:version pair
+			tradb.files[fields[1]] = FileState{size, mtime, ver}
+		case "version":
+			for _, entry := range fields[1:] {
+				pair := strings.Split(entry, ":") // replica:version pair
 
-					v, err := strconv.Atoi(pair[1])
-					checkError(err)
+				v, err := strconv.Atoi(pair[1])
+				checkError(err)
 
-					version[pair[0]] = v
-				}
-			    tradb.version = version
-			case "replica":
-			    if (len(fields) != 2) {
-					continue
-				}
-			    tradb.replicaId = fields[1]
+				version[pair[0]] = v
+			}
+			tradb.version = version
+		case "replica":
+			if len(fields) != 2 {
+				continue
+			}
+			tradb.replicaId = fields[1]
 		}
 	}
 
@@ -118,11 +118,11 @@ func createDb() TraDb {
 	filemap := make(map[string]FileState)
 	for _, file := range files {
 		if file.IsDir() {
-			continue			// ignore directories for now
+			continue // ignore directories for now
 		}
 		fs := FileState{
-			size: int(file.Size()),
-			mtime: file.ModTime().UnixNano(),
+			size:    int(file.Size()),
+			mtime:   file.ModTime().UnixNano(),
 			version: 1,
 		}
 		filemap[file.Name()] = fs
@@ -158,7 +158,7 @@ func writeDb(tradb TraDb) {
 			info.mtime,
 			info.version,
 		)
-		i = i+1
+		i = i + 1
 	}
 
 	entryString := strings.Join(fileEntries, "\n")
