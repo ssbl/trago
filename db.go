@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"math/rand"
 	"os"
 	"strconv"
@@ -42,7 +43,7 @@ func parseDbFile() (TraDb, error) {
 
 	dbfile, err := os.Open(TRADB)
 	if os.IsNotExist(err) {
-		fmt.Println("didn't find .trago.db")
+		log.Println("didn't find .trago.db")
 		tradb = createDb()
 		writeDb(tradb)
 		return tradb, nil
@@ -170,7 +171,6 @@ func writeDb(tradb TraDb) {
 
 func checkError(err error) {
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 }
