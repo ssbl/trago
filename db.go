@@ -27,6 +27,7 @@ type FileState struct {
 	size    int
 	mtime   int64
 	version int
+	replica string
 	// TODO: use a hash as well
 }
 
@@ -78,9 +79,13 @@ func Parse() (TraDb, error) {
 			checkError(err)
 			mtime, err := strconv.ParseInt(fields[3], 10, 64)
 			checkError(err)
-			ver, err := strconv.Atoi(fields[4])
+
+			pair := strings.Split(fields[4], ":")
+			replicaId := pair[0]
+			ver, err := strconv.Atoi(pair[1])
 			checkError(err)
 
+			tradb.files[fields[1]] = FileState{size, mtime, ver, replicaId}
 		case "version": // version r1:v1 r2:v2 ...
 			for _, entry := range fields[1:] {
 				pair := strings.Split(entry, ":") // replica:version pair
@@ -91,6 +96,7 @@ func Parse() (TraDb, error) {
 				version[pair[0]] = v
 			}
 			tradb.version = version
+
 		case "replica": // replica replica-id
 			if len(fields) != 2 {
 				continue
@@ -154,10 +160,11 @@ func (tradb *TraDb) Write() {
 	i := 0
 	for filename, info := range tradb.files {
 		fileEntries[i] = fmt.Sprintf(
-			"file %s %d %d %d",
+			"file %s %d %d %s:%d",
 			filename,
 			info.size,
 			info.mtime,
+			info.replica,
 			info.version,
 		)
 		i = i + 1
