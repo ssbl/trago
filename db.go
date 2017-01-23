@@ -69,7 +69,7 @@ func Parse() (TraDb, error) {
 		}
 
 		switch fields[0] {
-		case "file":
+		case "file": // file name size mtime replica:version
 			if len(fields) != 5 {
 				continue
 			}
@@ -81,8 +81,7 @@ func Parse() (TraDb, error) {
 			ver, err := strconv.Atoi(fields[4])
 			checkError(err)
 
-			tradb.files[fields[1]] = FileState{size, mtime, ver}
-		case "version":
+		case "version": // version r1:v1 r2:v2 ...
 			for _, entry := range fields[1:] {
 				pair := strings.Split(entry, ":") // replica:version pair
 
@@ -92,7 +91,7 @@ func Parse() (TraDb, error) {
 				version[pair[0]] = v
 			}
 			tradb.version = version
-		case "replica":
+		case "replica": // replica replica-id
 			if len(fields) != 2 {
 				continue
 			}
