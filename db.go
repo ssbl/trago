@@ -31,21 +31,22 @@ type FileState struct {
 }
 
 func main() {
-	db, err := parseDbFile()
+	db, err := Parse()
 	checkError(err)
 
-	fmt.Println(db)
+	db.Update()
 }
 
-func parseDbFile() (TraDb, error) {
+func Parse() (TraDb, error) {
 	tradb := TraDb{}
 	version := make(map[string]int)
 
 	dbfile, err := os.Open(TRADB)
 	if os.IsNotExist(err) {
 		log.Println("didn't find .trago.db")
-		tradb = createDb()
-		writeDb(tradb)
+		tradb = *New()
+		tradb.Write()
+
 		return tradb, nil
 	} else if err != nil {
 		return tradb, err
@@ -104,7 +105,7 @@ func parseDbFile() (TraDb, error) {
 	return tradb, nil
 }
 
-func createDb() TraDb {
+func New() *TraDb {
 	replicaId := make([]byte, 16)
 	version := make(map[string]int)
 
@@ -125,14 +126,15 @@ func createDb() TraDb {
 			size:    int(file.Size()),
 			mtime:   file.ModTime().UnixNano(),
 			version: 1,
+			replica: string(replicaId),
 		}
 		filemap[file.Name()] = fs
 	}
 
-	return TraDb{string(replicaId), version, filemap}
+	return &TraDb{string(replicaId), version, filemap}
 }
 
-func writeDb(tradb TraDb) {
+func (tradb *TraDb) Write() {
 	var pairs []string
 
 	for replicaId, version := range tradb.version {
