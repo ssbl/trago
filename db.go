@@ -177,6 +177,29 @@ func (tradb *TraDb) Write() {
 	checkError(err)
 }
 
+func (db *TraDb) Update() {
+	files, err := ioutil.ReadDir(currentDir)
+	checkError(err)
+
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+
+		filename := file.Name()
+		dbRecord := db.files[filename]
+		if dbRecord.mtime == 0 {
+			log.Printf("found a new file: %s\n", filename)
+		} else if dbRecord.mtime < file.ModTime().UnixNano() {
+			log.Printf("found an updated file: %s\n", filename)
+			dbRecord.mtime = file.ModTime().UnixNano()
+			dbRecord.version = db.version[db.replicaId]
+		} else {
+			log.Printf("file unchanged: %s\n", file.Name())
+		}
+	}
+}
+
 func checkError(err error) {
 	if err != nil {
 		log.Fatal(err)
