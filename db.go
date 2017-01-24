@@ -18,16 +18,16 @@ const (
 )
 
 type TraDb struct {
-	replicaId string
-	version   map[string]int
-	files     map[string]FileState
+	ReplicaId string
+	Version   map[string]int
+	Files     map[string]FileState
 }
 
 type FileState struct {
-	size    int
-	mtime   int64
-	version int
-	replica string
+	Size    int
+	MTime   int64
+	Version int
+	Replica string
 	// TODO: use a hash as well
 }
 
@@ -54,7 +54,7 @@ func Parse() (TraDb, error) {
 	}
 
 	defer dbfile.Close()
-	tradb.files = make(map[string]FileState)
+	tradb.Files = make(map[string]FileState)
 
 	scanner := bufio.NewScanner(dbfile)
 	for scanner.Scan() {
@@ -85,7 +85,7 @@ func Parse() (TraDb, error) {
 			ver, err := strconv.Atoi(pair[1])
 			checkError(err)
 
-			tradb.files[fields[1]] = FileState{size, mtime, ver, replicaId}
+			tradb.Files[fields[1]] = FileState{size, mtime, ver, replicaId}
 		case "version": // version r1:v1 r2:v2 ...
 			for _, entry := range fields[1:] {
 				pair := strings.Split(entry, ":") // replica:version pair
@@ -95,13 +95,13 @@ func Parse() (TraDb, error) {
 
 				version[pair[0]] = v
 			}
-			tradb.version = version
+			tradb.Version = version
 
 		case "replica": // replica replica-id
 			if len(fields) != 2 {
 				continue
 			}
-			tradb.replicaId = fields[1]
+			tradb.ReplicaId = fields[1]
 		}
 	}
 
@@ -128,10 +128,10 @@ func New() *TraDb {
 			continue // ignore directories for now
 		}
 		fs := FileState{
-			size:    int(file.Size()),
-			mtime:   file.ModTime().UnixNano(),
-			version: 1,
-			replica: string(replicaId),
+			Size:    int(file.Size()),
+			MTime:   file.ModTime().UnixNano(),
+			Version: 1,
+			Replica: string(replicaId),
 		}
 		filemap[file.Name()] = fs
 	}
@@ -142,7 +142,7 @@ func New() *TraDb {
 func (tradb *TraDb) Write() {
 	var pairs []string
 
-	for replicaId, version := range tradb.version {
+	for replicaId, version := range tradb.Version {
 		entry := strings.Join([]string{replicaId, strconv.Itoa(version)}, ":")
 		pairs = append(pairs, entry)
 	}
@@ -151,21 +151,21 @@ func (tradb *TraDb) Write() {
 
 	preamble := fmt.Sprintf(
 		"replica %s\nversion %s\n# files\n",
-		tradb.replicaId,
+		tradb.ReplicaId,
 		versionVector,
 	)
 
-	fileEntries := make([]string, len(tradb.files))
+	fileEntries := make([]string, len(tradb.Files))
 
 	i := 0
-	for filename, info := range tradb.files {
+	for filename, info := range tradb.Files {
 		fileEntries[i] = fmt.Sprintf(
 			"file %s %d %d %s:%d",
 			filename,
-			info.size,
-			info.mtime,
-			info.replica,
-			info.version,
+			info.Size,
+			info.MTime,
+			info.Replica,
+			info.Version,
 		)
 		i = i + 1
 	}
@@ -187,13 +187,13 @@ func (db *TraDb) Update() {
 		}
 
 		filename := file.Name()
-		dbRecord := db.files[filename]
-		if dbRecord.mtime == 0 {
+		dbRecord := db.Files[filename]
+		if dbRecord.MTime == 0 {
 			log.Printf("found a new file: %s\n", filename)
-		} else if dbRecord.mtime < file.ModTime().UnixNano() {
+		} else if dbRecord.MTime < file.ModTime().UnixNano() {
 			log.Printf("found an updated file: %s\n", filename)
-			dbRecord.mtime = file.ModTime().UnixNano()
-			dbRecord.version = db.version[db.replicaId]
+			dbRecord.MTime = file.ModTime().UnixNano()
+			dbRecord.Version = db.Version[db.ReplicaId]
 		} else {
 			log.Printf("file unchanged: %s\n", file.Name())
 		}
