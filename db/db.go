@@ -1,4 +1,4 @@
-package main
+package db
 
 import (
 	"bufio"
@@ -29,13 +29,6 @@ type FileState struct {
 	Version int
 	Replica string
 	// TODO: use a hash as well
-}
-
-func main() {
-	db, err := Parse()
-	checkError(err)
-
-	db.Update()
 }
 
 func Parse() (TraDb, error) {
@@ -195,7 +188,7 @@ func (db *TraDb) Update() {
 			dbRecord.MTime = file.ModTime().UnixNano()
 			dbRecord.Version = db.Version[db.ReplicaId]
 		} else {
-			log.Printf("file unchanged: %s\n", file.Name())
+			log.Printf("file unchanged: %s\n", filename)
 		}
 	}
 }
