@@ -6,11 +6,13 @@ import (
 	"log"
 	"os"
 	"os/exec"
+
+	"github.com/ssbl/trago/db"
 )
 
 const (
 	SERVFLAG = "-s"
-	SERVCMD  = "go run $GOPATH/src/trago/server.go -s"
+	SERVCMD  = "go run $GOPATH/src/github.com/ssbl/trago/server.go -s"
 )
 
 var (
@@ -29,9 +31,16 @@ func main() {
 			if err == io.EOF {
 				log.Println("got EOF, exiting...")
 				break
-			}
+			} else if msg == "parse\n" {
+				tradb, err := db.Parse()
+				if err != nil {
+					log.Fatal(err)
+				}
 
-			log.Println("got message: " + msg)
+				log.Print(tradb)
+			} else {
+				log.Print("got message: " + msg)
+			}
 		}
 	} else {
 		cmd := exec.Command("ssh", "localhost", SERVCMD)
@@ -47,13 +56,17 @@ func main() {
 		}
 
 		log.Println("waiting on input...")
-		msg, _ := bufio.NewReader(os.Stdin).ReadBytes('\n')
+		for {
+			msg, err := bufio.NewReader(os.Stdin).ReadBytes('\n')
+			if err == io.EOF {
+				stdin.Close()
+				break
+			}
 
-		if _, err := stdin.Write(msg); err != nil {
-			log.Fatal("error writing to pipe")
+			if _, err := stdin.Write(msg); err != nil {
+				log.Fatal("error writing to pipe")
+			}
 		}
-
-		stdin.Close()			// looks like this sends EOF
 	}
 }
 
