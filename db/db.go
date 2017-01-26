@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -107,6 +108,7 @@ func New() *TraDb {
 	replicaId := make([]byte, 16)
 	version := make(map[string]int)
 
+	rand.Seed(time.Now().UTC().UnixNano())
 	for i, _ := range replicaId {
 		replicaId[i] = bytes[rand.Intn(len(bytes))]
 	}
