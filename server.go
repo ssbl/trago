@@ -19,6 +19,13 @@ var (
 	isServer bool
 )
 
+type TraServ struct {
+	Database *db.TraDb
+	Stdin    io.WriteCloser
+	Stdout   io.ReadCloser
+	Stderr   io.ReadCloser
+}
+
 func main() {
 	if isElem(os.Args, SERVFLAG) {
 		isServer = true
