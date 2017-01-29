@@ -88,6 +88,30 @@ func Parse(data string) (TraDb, error) {
 	return tradb, nil
 }
 
+func ParseFile() (TraDb, error) {
+	tradb := TraDb{}
+
+	dbfile, err := os.Open(TRADB)
+	if os.IsNotExist(err) {
+		log.Println("didn't find .trago.db")
+		tradb = *New()
+		tradb.Write()
+
+		return tradb, nil
+	} else if err != nil {
+		return tradb, err
+	}
+
+	defer dbfile.Close()
+
+	bs, err := ioutil.ReadFile(TRADB)
+	if err != nil {
+		return TraDb{}, err
+	}
+
+	return Parse(string(bs))
+}
+
 func New() *TraDb {
 	replicaId := make([]byte, 16)
 	version := make(map[string]int)

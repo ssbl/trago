@@ -39,7 +39,7 @@ func main() {
 				log.Println("got EOF, exiting...")
 				break
 			} else if msg == "parse\n" {
-				tradb, err := db.Parse()
+				tradb, err := db.ParseFile()
 				if err != nil {
 					log.Fatal(err)
 				}
