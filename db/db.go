@@ -1,7 +1,6 @@
 package db
 
 import (
-	"bufio"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -32,27 +31,14 @@ type FileState struct {
 	// TODO: use a hash as well
 }
 
-func Parse() (TraDb, error) {
+func Parse(data string) (TraDb, error) {
 	tradb := TraDb{}
 	version := make(map[string]int)
 
-	dbfile, err := os.Open(TRADB)
-	if os.IsNotExist(err) {
-		log.Println("didn't find .trago.db")
-		tradb = *New()
-		tradb.Write()
-
-		return tradb, nil
-	} else if err != nil {
-		return tradb, err
-	}
-
-	defer dbfile.Close()
 	tradb.Files = make(map[string]FileState)
 
-	scanner := bufio.NewScanner(dbfile)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
+	for _, line := range strings.Split(data, "\n") {
+		line = strings.TrimSpace(line)
 
 		if strings.HasPrefix(line, "#") {
 			continue
@@ -98,8 +84,6 @@ func Parse() (TraDb, error) {
 			tradb.ReplicaId = fields[1]
 		}
 	}
-
-	checkError(scanner.Err())
 
 	return tradb, nil
 }
