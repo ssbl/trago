@@ -203,6 +203,37 @@ func (db *TraDb) Update() {
 	}
 }
 
+func (local *TraDb) Compare(remote *TraDb) {
+	remoteFiles := remote.Files
+
+	for file, state := range local.Files {
+		remoteState := remoteFiles[file]
+
+		if remoteState.Version == 0 { // file not present on server
+			// TODO: download only if we have a more "recent" copy
+			continue
+		}
+
+		if isFileChanged(state, remoteState) {
+			if local.Version[remoteState.Replica] >= remoteState.Version {
+				continue		// we already know about changes on remote
+			} else if remote.Version[state.Replica] >= state.Version {
+				fmt.Printf("downloading: %s\n", file)
+				continue
+			} else {
+				fmt.Printf("conflict: %s\n", file)
+			}
+		}
+	}
+}
+
+func isFileChanged(fs1 FileState, fs2 FileState) bool {
+	if fs1.MTime != fs2.MTime || fs1.Size != fs2.Size {
+		return false
+	}
+	return true
+}
+
 func checkError(err error) {
 	if err != nil {
 		log.Fatal(err)
