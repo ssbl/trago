@@ -18,9 +18,9 @@ const (
 )
 
 type TraDb struct {
-	ReplicaId string
-	Version   map[string]int
-	Files     map[string]FileState
+	ReplicaId  string
+	VersionVec map[string]int
+	Files      map[string]FileState
 }
 
 type FileState struct {
@@ -33,7 +33,7 @@ type FileState struct {
 
 func Parse(data string) (TraDb, error) {
 	tradb := TraDb{}
-	version := make(map[string]int)
+	versionVector := make(map[string]int)
 
 	tradb.Files = make(map[string]FileState)
 
@@ -73,9 +73,9 @@ func Parse(data string) (TraDb, error) {
 				v, err := strconv.Atoi(pair[1])
 				checkError(err)
 
-				version[pair[0]] = v
+				versionVector[pair[0]] = v
 			}
-			tradb.Version = version
+			tradb.VersionVec = versionVector
 
 		case "replica": // replica replica-id
 			if len(fields) != 2 {
@@ -114,13 +114,13 @@ func ParseFile() (TraDb, error) {
 
 func New() *TraDb {
 	replicaId := make([]byte, 16)
-	version := make(map[string]int)
+	versionVector := make(map[string]int)
 
 	rand.Seed(time.Now().UTC().UnixNano())
 	for i, _ := range replicaId {
 		replicaId[i] = bytes[rand.Intn(len(bytes))]
 	}
-	version[string(replicaId)] = 1
+	versionVector[string(replicaId)] = 1
 
 	files, err := ioutil.ReadDir(currentDir)
 	checkError(err)
@@ -139,13 +139,13 @@ func New() *TraDb {
 		filemap[file.Name()] = fs
 	}
 
-	return &TraDb{string(replicaId), version, filemap}
+	return &TraDb{string(replicaId), versionVector, filemap}
 }
 
 func (tradb *TraDb) Write() {
 	var pairs []string
 
-	for replicaId, version := range tradb.Version {
+	for replicaId, version := range tradb.VersionVec {
 		entry := strings.Join([]string{replicaId, strconv.Itoa(version)}, ":")
 		pairs = append(pairs, entry)
 	}
@@ -196,7 +196,7 @@ func (db *TraDb) Update() {
 		} else if dbRecord.MTime < file.ModTime().UnixNano() {
 			log.Printf("found an updated file: %s\n", filename)
 			dbRecord.MTime = file.ModTime().UnixNano()
-			dbRecord.Version = db.Version[db.ReplicaId]
+			dbRecord.Version = db.VersionVec[db.ReplicaId]
 		} else {
 			log.Printf("file unchanged: %s\n", filename)
 		}
@@ -215,9 +215,9 @@ func (local *TraDb) Compare(remote *TraDb) {
 		}
 
 		if isFileChanged(state, remoteState) {
-			if local.Version[remoteState.Replica] >= remoteState.Version {
-				continue		// we already know about changes on remote
-			} else if remote.Version[state.Replica] >= state.Version {
+			if local.VersionVec[remoteState.Replica] >= remoteState.Version {
+				continue // we already know about changes on remote
+			} else if remote.VersionVec[state.Replica] >= state.Version {
 				fmt.Printf("downloading: %s\n", file)
 				continue
 			} else {
