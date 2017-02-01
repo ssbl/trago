@@ -201,6 +201,8 @@ func (db *TraDb) Update() {
 			log.Printf("file unchanged: %s\n", filename)
 		}
 	}
+
+	db.VersionVec[db.ReplicaId] += 1
 }
 
 func (local *TraDb) Compare(remote *TraDb) {
