@@ -2,7 +2,10 @@ package main
 
 import (
 	"bufio"
+	"bytes"
+	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -39,19 +42,25 @@ func main() {
 				log.Println("got EOF, exiting...")
 				break
 			} else if msg == "parse\n" {
-				tradb, err := db.ParseFile()
+				_, err := db.ParseFile()
 				if err != nil {
 					log.Fatal(err)
 				}
 
-				log.Print(tradb)
+				bs, err := ioutil.ReadFile(db.TRADB)
+				if err != nil {
+					log.Fatalf("error reading file: %v\n", err)
+				} else {
+					fmt.Print(string(bs))
+				}
 			} else {
 				log.Print("got message: " + msg)
 			}
 		}
 	} else {
 		cmd := exec.Command("ssh", "localhost", SERVCMD)
-		cmd.Stdout = os.Stdout
+		stdout := new(bytes.Buffer)
+		cmd.Stdout = stdout
 		cmd.Stderr = os.Stderr
 		stdin, err := cmd.StdinPipe()
 		if err != nil {
@@ -64,6 +73,16 @@ func main() {
 
 		log.Println("waiting on input...")
 		for {
+			if stdout.Len() != 0 {
+				tradb, err := db.Parse(stdout.String())
+				if err != nil {
+					fmt.Println("error parsing file")
+					break
+				}
+				fmt.Println(tradb)
+				stdout.Reset()
+				continue
+			}
 			msg, err := bufio.NewReader(os.Stdin).ReadBytes('\n')
 			if err == io.EOF {
 				stdin.Close()
