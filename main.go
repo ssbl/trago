@@ -12,9 +12,7 @@ import (
 const (
 	SERVFLAG = "-s"
 	SERVCMD = "trago -s {dir}"
-	serverUsage = "Run in server mode in the specified directory.\n" +
-		"If this is set, all other options are ignored."
-	serverUsageShort = "Shorthand for --server."
+	serverUsage = "Run in server mode in the specified directory.\n"
 )
 
 var (
@@ -27,7 +25,7 @@ var (
 
 func init() {
 	flag.StringVar(&flagDir, "server", defaultDir, serverUsage)
-	flag.StringVar(&flagDir, "s", defaultDir, serverUsageShort)
+	flag.StringVar(&flagDir, "s", defaultDir, "Shorthand for --server.")
 
 	log.SetFlags(0)
 	flag.Usage = usage
@@ -45,9 +43,7 @@ func main() {
 func usage() {
 	log.Printf("Usage: trago server:dir client-dir\n\n")
 
-	flag.VisitAll(func(f *flag.Flag){
-		log.Printf("-%s: %s\n", f.Name, f.Usage)
-	})
+	log.Printf("-s|--server <dir>\n    %s\n", serverUsage);
 }
 
 func parseArgs() (string, string, string) {
