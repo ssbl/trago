@@ -2,11 +2,12 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"strings"
 
-	// "github.com/ssbl/trago/db"
+	"github.com/ssbl/trago/db"
 )
 
 const (
@@ -37,6 +38,18 @@ func main() {
 	if flagDir == defaultDir {
 		server, serverDir, clientDir := parseArgs()
 		log.Printf("%s:%s %s\n", server, serverDir, clientDir)
+	} else {	  // running in server mode, so we ignore all other flags
+		if err := os.Chdir(flagDir); err != nil {
+			log.Fatalf("Error changing to directory: %s\n", err)
+		}
+		
+		tradb, err := db.ParseFile()
+		if err != nil {
+			log.Fatalf("Error parsing db file: %s\n", err)
+		}
+
+		tradb.Update()
+		fmt.Println(tradb)		// send db to stdout
 	}
 }
 
