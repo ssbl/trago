@@ -64,7 +64,7 @@ func main() {
 func usage() {
 	log.Printf("Usage: trago server:dir client-dir\n\n")
 
-	log.Printf("-s|--server <dir>\n    %s\n", serverUsage);
+	log.Printf("-s <dir>, --server <dir>\n    %s\n", serverUsage);
 }
 
 func parseArgs() (string, string, string) {
