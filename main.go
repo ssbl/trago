@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -49,7 +50,14 @@ func main() {
 		}
 
 		tradb.Update()
-		fmt.Println(tradb)		// send db to stdout
+		tradb.Write()
+
+		bs, err := ioutil.ReadFile(db.TRADB)
+		if err != nil {
+			log.Fatalf("error reading file: %s\n", err)
+		}
+
+		fmt.Println(string(bs))		// send db to stdout
 	}
 }
 
