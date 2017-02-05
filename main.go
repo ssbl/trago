@@ -49,8 +49,13 @@ func main() {
 			log.Fatalf("Error parsing db file: %s\n", err)
 		}
 
-		tradb.Update()
-		tradb.Write()
+		if err := tradb.Update(); err != nil {
+			log.Fatalf("Error updating db file: %s\n", err)
+		}
+
+		if err := tradb.Write(); err != nil {
+			log.Fatalf("Error writing to db file: %s\n", err)
+		}
 
 		bs, err := ioutil.ReadFile(db.TRADB)
 		if err != nil {

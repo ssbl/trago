@@ -142,7 +142,7 @@ func New() *TraDb {
 	return &TraDb{string(replicaId), versionVector, filemap}
 }
 
-func (tradb *TraDb) Write() {
+func (tradb *TraDb) Write() error {
 	var pairs []string
 
 	for replicaId, version := range tradb.VersionVec {
@@ -177,12 +177,14 @@ func (tradb *TraDb) Write() {
 	dataToWrite := []byte(preamble + entryString)
 
 	err := ioutil.WriteFile(TRADB, dataToWrite, 0644)
-	checkError(err)
+	return err
 }
 
-func (db *TraDb) Update() {
+func (db *TraDb) Update() error {
 	files, err := ioutil.ReadDir(currentDir)
-	checkError(err)
+	if err != nil {
+		return err
+	}
 
 	for _, file := range files {
 		if file.IsDir() {
@@ -203,6 +205,7 @@ func (db *TraDb) Update() {
 	}
 
 	db.VersionVec[db.ReplicaId] += 1
+	return nil
 }
 
 func (local *TraDb) Compare(remote *TraDb) {
@@ -220,10 +223,10 @@ func (local *TraDb) Compare(remote *TraDb) {
 			if local.VersionVec[remoteState.Replica] >= remoteState.Version {
 				continue // we already know about changes on remote
 			} else if remote.VersionVec[state.Replica] >= state.Version {
-				fmt.Printf("downloading: %s\n", file)
+				log.Printf("downloading: %s\n", file)
 				continue
 			} else {
-				fmt.Printf("conflict: %s\n", file)
+				log.Printf("conflict: %s\n", file)
 			}
 		}
 	}
