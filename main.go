@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/ssbl/trago/db"
@@ -38,7 +40,30 @@ func main() {
 
 	if flagDir == defaultDir {
 		server, serverDir, clientDir := parseArgs()
-		log.Printf("%s:%s %s\n", server, serverDir, clientDir)
+		fmt.Printf("%s:%s %s\n", server, serverDir, clientDir)
+
+		if err := os.Chdir(clientDir); err != nil {
+			log.Fatalf("Error changing to directory: %s\n", err)
+		}
+
+		cmd := exec.Command("ssh", server,
+			strings.Replace(SERVCMD, "{dir}", serverDir, 1))
+
+		stdout := new(bytes.Buffer)
+		stderr := new(bytes.Buffer)
+		cmd.Stdout = stdout
+		cmd.Stderr = stderr
+
+		if err := cmd.Run(); err != nil {
+			log.Fatalf(string(stderr.Bytes()))
+		}
+
+		parsed, err := db.Parse(string(stdout.Bytes()))
+		if err != nil {
+			log.Fatal("Error parsing server response")
+		}
+
+		fmt.Println(parsed)
 	} else {	  // running in server mode, so we ignore all other flags
 		if err := os.Chdir(flagDir); err != nil {
 			log.Fatalf("Error changing to directory: %s\n", err)
