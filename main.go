@@ -38,7 +38,7 @@ func init() {
 func main() {
 	flag.Parse()
 
-	if flagDir == defaultDir {
+	if flag.NFlag() != 1 {
 		server, serverDir, clientDir := parseArgs()
 		fmt.Printf("%s:%s %s\n", server, serverDir, clientDir)
 
