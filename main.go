@@ -42,9 +42,8 @@ func main() {
 		server, serverDir, clientDir := parseArgs()
 		fmt.Printf("%s:%s %s\n", server, serverDir, clientDir)
 
-		if err := os.Chdir(clientDir); err != nil {
-			log.Fatalf("Error changing to directory: %s\n", err)
-		}
+		err := os.Chdir(clientDir)
+		assert(err, "Error changing to directory: %s\n", err)
 
 		cmd := exec.Command("ssh", server,
 			strings.Replace(SERVCMD, "{dir}", serverDir, 1))
@@ -54,14 +53,11 @@ func main() {
 		cmd.Stdout = stdout
 		cmd.Stderr = stderr
 
-		if err := cmd.Run(); err != nil {
-			log.Fatalf(string(stderr.Bytes()))
-		}
+		err = cmd.Run()
+		assert(err, string(stderr.Bytes()))
 
 		parsed, err := db.Parse(string(stdout.Bytes()))
-		if err != nil {
-			log.Fatal("Error parsing server response")
-		}
+		assert(err, "Error parsing server response")
 
 		fmt.Println(parsed)
 	} else {	  // running in server mode, so we ignore all other flags
@@ -70,22 +66,16 @@ func main() {
 		}
 		
 		tradb, err := db.ParseFile()
-		if err != nil {
-			log.Fatalf("Error parsing db file: %s\n", err)
-		}
+		assert(err, "Error parsing db file: %s\n", err)
 
-		if err := tradb.Update(); err != nil {
-			log.Fatalf("Error updating db file: %s\n", err)
-		}
+		err = tradb.Update()
+		assert(err, "Error updating db file: %s\n", err)
 
-		if err := tradb.Write(); err != nil {
-			log.Fatalf("Error writing to db file: %s\n", err)
-		}
+		err = tradb.Write()
+		assert(err, "Error writing to db file: %s\n", err)
 
 		bs, err := ioutil.ReadFile(db.TRADB)
-		if err != nil {
-			log.Fatalf("error reading file: %s\n", err)
-		}
+		assert(err, "Error reading file: %s\n", err)
 
 		fmt.Println(string(bs))		// send db to stdout
 	}
@@ -117,4 +107,10 @@ func parseArgs() (string, string, string) {
 	cd = strings.TrimSpace(flag.Arg(1))
 
 	return s, sd, cd
+}
+
+func assert(err error, format string, args ...interface{}) {
+	if err != nil {
+		log.Fatalf(format, args)
+	}
 }
