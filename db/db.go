@@ -56,14 +56,21 @@ func Parse(data string) (TraDb, error) {
 			}
 
 			size, err := strconv.Atoi(fields[2])
-			checkError(err)
+			if err != nil {
+				return tradb, err
+			}
+
 			mtime, err := strconv.ParseInt(fields[3], 10, 64)
-			checkError(err)
+			if err != nil {
+				return tradb, err
+			}
 
 			pair := strings.Split(fields[4], ":")
 			replicaId := pair[0]
 			ver, err := strconv.Atoi(pair[1])
-			checkError(err)
+			if err != nil {
+				return tradb, err
+			}
 
 			tradb.Files[fields[1]] = FileState{size, mtime, ver, replicaId}
 		case "version": // version r1:v1 r2:v2 ...
@@ -71,7 +78,9 @@ func Parse(data string) (TraDb, error) {
 				pair := strings.Split(entry, ":") // replica:version pair
 
 				v, err := strconv.Atoi(pair[1])
-				checkError(err)
+				if err != nil {
+					return tradb, err
+				}
 
 				versionVector[pair[0]] = v
 			}
