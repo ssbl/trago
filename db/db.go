@@ -141,7 +141,7 @@ func New() *TraDb {
 		}
 		fs := FileState{
 			Size:    int(file.Size()),
-			MTime:   file.ModTime().UnixNano(),
+			MTime:   file.ModTime().UTC().UnixNano(),
 			Version: 1,
 			Replica: string(replicaId),
 		}
@@ -204,9 +204,9 @@ func (db *TraDb) Update() error {
 		dbRecord := db.Files[filename]
 		if dbRecord.MTime == 0 {
 			log.Printf("found a new file: %s\n", filename)
-		} else if dbRecord.MTime < file.ModTime().UnixNano() {
+		} else if dbRecord.MTime < file.ModTime().UTC().UnixNano() {
 			log.Printf("found an updated file: %s\n", filename)
-			dbRecord.MTime = file.ModTime().UnixNano()
+			dbRecord.MTime = file.ModTime().UTC().UnixNano()
 			dbRecord.Version = db.VersionVec[db.ReplicaId]
 		} else {
 			log.Printf("file unchanged: %s\n", filename)
