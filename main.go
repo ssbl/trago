@@ -38,7 +38,7 @@ func init() {
 func main() {
 	flag.Parse()
 
-	if flag.NFlag() != 1 {
+	if !isServer() {
 		server, serverDir, clientDir := parseArgs()
 		fmt.Printf("%s:%s %s\n", server, serverDir, clientDir)
 
@@ -61,9 +61,8 @@ func main() {
 
 		fmt.Println(parsed)
 	} else {	  // running in server mode, so we ignore all other flags
-		if err := os.Chdir(flagDir); err != nil {
-			log.Fatalf("Error changing to directory: %s\n", err)
-		}
+		err := os.Chdir(flagDir)
+		assert(err, "Error changing to directory: %s\n", err)
 		
 		tradb, err := db.ParseFile()
 		assert(err, "Error parsing db file: %s\n", err)
@@ -79,6 +78,10 @@ func main() {
 
 		fmt.Println(string(bs))		// send db to stdout
 	}
+}
+
+func isServer() bool {
+	return flag.NFlag() == 1
 }
 
 func usage() {
