@@ -115,7 +115,7 @@ func ParseFile() (TraDb, error) {
 
 	bs, err := ioutil.ReadFile(TRADB)
 	if err != nil {
-		return TraDb{}, err
+		return tradb, err
 	}
 
 	return Parse(string(bs))

@@ -54,10 +54,10 @@ func main() {
 		cmd.Stderr = stderr
 
 		err = cmd.Run()
-		assert(err, string(stderr.Bytes()))
+		assert(err, stderr.String())
 
-		parsed, err := db.Parse(string(stdout.Bytes()))
-		assert(err, "Error parsing server response")
+		parsed, err := db.Parse(stdout.String())
+		assert(err, "Error parsing server response\n")
 
 		fmt.Println(parsed)
 	} else {	  // running in server mode, so we ignore all other flags
