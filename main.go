@@ -56,14 +56,20 @@ func main() {
 		err = cmd.Run()
 		assert(err, stderr.String())
 
-		parsed, err := db.Parse(stdout.String())
+		remoteDb, err := db.Parse(stdout.String())
 		assert(err, "Error parsing server response\n")
 
-		fmt.Println(parsed)
+		localDb, err := db.ParseFile()
+		assert(err, "Error parsing db file: %s\n", err)
+
+		err = localDb.Update()
+		assert(err, "Error updating local db: %s\n", err)
+
+		localDb.Compare(remoteDb)
 	} else {	  // running in server mode, so we ignore all other flags
 		err := os.Chdir(flagDir)
 		assert(err, "Error changing to directory: %s\n", err)
-		
+
 		tradb, err := db.ParseFile()
 		assert(err, "Error parsing db file: %s\n", err)
 

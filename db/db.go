@@ -195,6 +195,9 @@ func (db *TraDb) Update() error {
 		return err
 	}
 
+	db.VersionVec[db.ReplicaId] += 1
+	ourVersion := db.VersionVec[db.ReplicaId]
+
 	for _, file := range files {
 		if file.IsDir() {
 			continue
@@ -204,16 +207,21 @@ func (db *TraDb) Update() error {
 		dbRecord := db.Files[filename]
 		if dbRecord.MTime == 0 {
 			log.Printf("found a new file: %s\n", filename)
+			db.Files[filename] = FileState{
+				Size:    int(file.Size()),
+				MTime:   file.ModTime().UTC().UnixNano(),
+				Version: ourVersion,
+				Replica: db.ReplicaId,
+			}
 		} else if dbRecord.MTime < file.ModTime().UTC().UnixNano() {
 			log.Printf("found an updated file: %s\n", filename)
 			dbRecord.MTime = file.ModTime().UTC().UnixNano()
-			dbRecord.Version = db.VersionVec[db.ReplicaId]
+			dbRecord.Version = ourVersion
 		} else {
 			log.Printf("file unchanged: %s\n", filename)
 		}
 	}
 
-	db.VersionVec[db.ReplicaId] += 1
 	return nil
 }
 
@@ -224,19 +232,28 @@ func (local *TraDb) Compare(remote *TraDb) {
 		remoteState := remoteFiles[file]
 
 		if remoteState.Version == 0 { // file not present on server
-			// TODO: download only if we have a more "recent" copy
-			continue
+			if state.Version <= remote.VersionVec[state.Replica] {
+				log.Printf("deleting: %s\n", file)
+			}
 		}
 
 		if isFileChanged(state, remoteState) {
 			if local.VersionVec[remoteState.Replica] >= remoteState.Version {
-				continue // we already know about changes on remote
+				log.Printf("keeping: %s\n", file)
 			} else if remote.VersionVec[state.Replica] >= state.Version {
 				log.Printf("downloading: %s\n", file)
 				continue
 			} else {
 				log.Printf("conflict: %s\n", file)
 			}
+		}
+	}
+
+	for file, state := range remoteFiles {
+		if local.Files[file].Version > 0 {
+			continue
+		} else if state.Version <= local.VersionVec[state.Replica] {
+			log.Printf("downloading: %s\n", file)
 		}
 	}
 }
