@@ -252,10 +252,22 @@ func (local *TraDb) Compare(remote *TraDb) {
 	for file, state := range remoteFiles {
 		if local.Files[file].Version > 0 {
 			continue
-		} else if state.Version <= local.VersionVec[state.Replica] {
+		} else if state.Version > local.VersionVec[state.Replica] {
 			log.Printf("downloading: %s\n", file)
 		}
 	}
+
+	for replica, version := range local.VersionVec {
+		if remote.VersionVec[replica] > version {
+			local.VersionVec[replica] = version
+		}
+	}
+	for replica, version := range remote.VersionVec {
+		if local.VersionVec[replica] < version {
+			local.VersionVec[replica] = version
+		}
+	}
+	log.Println(local.VersionVec)
 }
 
 func isFileChanged(fs1 FileState, fs2 FileState) bool {
