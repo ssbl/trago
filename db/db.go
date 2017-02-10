@@ -31,8 +31,8 @@ type FileState struct {
 	// TODO: use a hash as well
 }
 
-func Parse(data string) (TraDb, error) {
-	tradb := TraDb{}
+func Parse(data string) (*TraDb, error) {
+	tradb := &TraDb{}
 	versionVector := make(map[string]int)
 
 	tradb.Files = make(map[string]FileState)
@@ -97,13 +97,13 @@ func Parse(data string) (TraDb, error) {
 	return tradb, nil
 }
 
-func ParseFile() (TraDb, error) {
-	tradb := TraDb{}
+func ParseFile() (*TraDb, error) {
+	tradb := &TraDb{}
 
 	dbfile, err := os.Open(TRADB)
 	if os.IsNotExist(err) {
 		log.Println("didn't find .trago.db")
-		tradb = *New()
+		tradb = New()
 		tradb.Write()
 
 		return tradb, nil
