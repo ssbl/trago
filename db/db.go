@@ -242,10 +242,11 @@ func (local *TraDb) Compare(remote *TraDb) {
 				log.Printf("keeping: %s\n", file)
 			} else if remote.VersionVec[state.Replica] >= state.Version {
 				log.Printf("downloading: %s\n", file)
-				continue
 			} else {
 				log.Printf("conflict: %s\n", file)
 			}
+		} else {
+			log.Printf("unchanged: %s\n", file)
 		}
 	}
 
@@ -257,17 +258,23 @@ func (local *TraDb) Compare(remote *TraDb) {
 		}
 	}
 
-	for replica, version := range local.VersionVec {
-		if remote.VersionVec[replica] > version {
-			local.VersionVec[replica] = version
-		}
-	}
-	for replica, version := range remote.VersionVec {
-		if local.VersionVec[replica] < version {
-			local.VersionVec[replica] = version
-		}
-	}
+	combineVectors(local.VersionVec, remote.VersionVec)
+
 	log.Println(local.VersionVec)
+}
+
+func combineVectors(v1 map[string]int, v2 map[string]int) {
+	for replica, version := range v1 {
+		if v2[replica] > version {
+			v1[replica] = v2[replica]
+		}
+	}
+
+	for replica, version := range v2 {
+		if v1[replica] < version {
+			v1[replica] = version
+		}
+	}
 }
 
 func isFileChanged(fs1 FileState, fs2 FileState) bool {
