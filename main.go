@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -48,13 +50,19 @@ func main() {
 		cmd := exec.Command("ssh", server,
 			strings.Replace(SERVCMD, "{dir}", serverDir, 1))
 
+		stdin, err := cmd.StdinPipe()
+		assert(err, "Error creating pipe: %s\n", err)
+
 		stdout := new(bytes.Buffer)
 		stderr := new(bytes.Buffer)
 		cmd.Stdout = stdout
 		cmd.Stderr = stderr
 
-		err = cmd.Run()
+		err = cmd.Start()
 		assert(err, stderr.String())
+
+		_, err = stdin.Write([]byte("get\n"))
+		assert(err, "Error writing to pipe: %s\n", err)
 
 		remoteDb, err := db.Parse(stdout.String())
 		assert(err, "Error parsing server response\n")
@@ -65,7 +73,13 @@ func main() {
 		err = localDb.Update()
 		assert(err, "Error updating local db: %s\n", err)
 
+		err = localDb.Write()
+		assert(err, "Error writing to db file: %s\n", err)
+
 		localDb.Compare(remoteDb)
+
+		_, err = stdin.Write([]byte("quit\n"))
+		assert(err, "Error writing to pipe: %s\n", err)
 	} else {	  // running in server mode, so we ignore all other flags
 		err := os.Chdir(flagDir)
 		assert(err, "Error changing to directory: %s\n", err)
@@ -82,7 +96,24 @@ func main() {
 		bs, err := ioutil.ReadFile(db.TRADB)
 		assert(err, "Error reading file: %s\n", err)
 
-		fmt.Println(string(bs))		// send db to stdout
+		cmdLoop(string(bs))
+	}
+}
+
+func cmdLoop(db string) {
+	for {
+		msg, err := bufio.NewReader(os.Stdin).ReadString('\n')
+		if err == io.EOF {
+			return
+		}
+
+		switch (strings.TrimSpace(msg)) {
+		case "quit":
+			fmt.Println("quitting")
+
+		case "get":
+			fmt.Println(db)
+		}
 	}
 }
 
