@@ -31,6 +31,16 @@ type FileState struct {
 	// TODO: use a hash as well
 }
 
+type FileTag uint8
+
+const (
+	File = FileTag(iota)
+	Conflict
+	Directory
+	Deleted
+)
+
+
 func Parse(data string) (*TraDb, error) {
 	tradb := &TraDb{}
 	versionVector := make(map[string]int)
@@ -225,7 +235,8 @@ func (db *TraDb) Update() error {
 	return nil
 }
 
-func (local *TraDb) Compare(remote *TraDb) {
+func (local *TraDb) Compare(remote *TraDb) map[string]FileTag {
+	tags := make(map[string]FileTag)
 	remoteFiles := remote.Files
 
 	for file, state := range local.Files {
@@ -234,6 +245,7 @@ func (local *TraDb) Compare(remote *TraDb) {
 		if remoteState.Version == 0 { // file not present on server
 			if state.Version <= remote.VersionVec[state.Replica] {
 				log.Printf("deleting: %s\n", file)
+				tags[file] = Deleted
 			}
 		}
 
@@ -242,8 +254,10 @@ func (local *TraDb) Compare(remote *TraDb) {
 				log.Printf("keeping: %s\n", file)
 			} else if remote.VersionVec[state.Replica] >= state.Version {
 				log.Printf("downloading: %s\n", file)
+				tags[file] = File
 			} else {
 				log.Printf("conflict: %s\n", file)
+				tags[file] = Conflict
 			}
 		} else {
 			log.Printf("unchanged: %s\n", file)
@@ -255,12 +269,13 @@ func (local *TraDb) Compare(remote *TraDb) {
 			continue
 		} else if state.Version > local.VersionVec[state.Replica] {
 			log.Printf("downloading: %s\n", file)
+			tags[file] = File
 		}
 	}
 
 	combineVectors(local.VersionVec, remote.VersionVec)
-
 	log.Println(local.VersionVec)
+	return tags
 }
 
 func combineVectors(v1 map[string]int, v2 map[string]int) {

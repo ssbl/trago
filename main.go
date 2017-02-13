@@ -81,12 +81,13 @@ func main() {
 		assert(err, "Error writing to db file: %s\n", err)
 
 		fmt.Println(remoteDb)
-		localDb.Compare(remoteDb)
+		tags := localDb.Compare(remoteDb)
 
 		_, err = stdin.Write([]byte("quit\n"))
 		assert(err, "Error writing to pipe: %s\n", err)
 
 		stdin.Close()
+		fmt.Println(tags)
 	} else {	  // running in server mode, so we ignore all other flags
 		err := os.Chdir(flagDir)
 		assert(err, "Error changing to directory: %s\n", err)
