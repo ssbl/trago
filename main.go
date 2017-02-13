@@ -58,28 +58,35 @@ func main() {
 		cmd.Stdout = stdout
 		cmd.Stderr = stderr
 
-		err = cmd.Start()
-		assert(err, stderr.String())
-
-		_, err = stdin.Write([]byte("get\n"))
-		assert(err, "Error writing to pipe: %s\n", err)
-
-		remoteDb, err := db.Parse(stdout.String())
-		assert(err, "Error parsing server response\n")
-
 		localDb, err := db.ParseFile()
 		assert(err, "Error parsing db file: %s\n", err)
 
 		err = localDb.Update()
 		assert(err, "Error updating local db: %s\n", err)
 
+		err = cmd.Start()
+		assert(err, stderr.String())
+
+		fmt.Println("sending get")
+		_, err = stdin.Write([]byte("get\n"))
+		assert(err, "Error writing to pipe: %s\n", err)
+
+		fmt.Println("waiting for reply")
+		out := readStdout(stdout)
+
+		remoteDb, err := db.Parse(out)
+		assert(err, "Error parsing server response\n")
+
 		err = localDb.Write()
 		assert(err, "Error writing to db file: %s\n", err)
 
+		fmt.Println(remoteDb)
 		localDb.Compare(remoteDb)
 
 		_, err = stdin.Write([]byte("quit\n"))
 		assert(err, "Error writing to pipe: %s\n", err)
+
+		stdin.Close()
 	} else {	  // running in server mode, so we ignore all other flags
 		err := os.Chdir(flagDir)
 		assert(err, "Error changing to directory: %s\n", err)
@@ -100,6 +107,22 @@ func main() {
 	}
 }
 
+func readStdout(stdout *bytes.Buffer) string {
+	var buf [512]byte
+	out := new(bytes.Buffer)
+
+	for {
+		n, _ := stdout.Read(buf[0:])
+
+		out.Write(buf[0:n])
+		outStr := out.String()
+
+		if strings.HasSuffix(outStr, "\n\n\n") {
+			return outStr
+		}
+	}
+}
+
 func cmdLoop(db string) {
 	for {
 		msg, err := bufio.NewReader(os.Stdin).ReadString('\n')
@@ -113,6 +136,7 @@ func cmdLoop(db string) {
 
 		case "get":
 			fmt.Println(db)
+			fmt.Println("\n")
 		}
 	}
 }
