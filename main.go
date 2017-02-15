@@ -46,8 +46,7 @@ func main() {
 		server, serverDir, clientDir := parseArgs()
 		fmt.Printf("%s:%s %s\n", server, serverDir, clientDir)
 
-		err := os.Chdir(clientDir)
-		assert(err, "Error changing to directory: %s\n", err)
+		localDb := getLocalDb(clientDir)
 
 		cmd := exec.Command("ssh", server,
 			strings.Replace(SERVCMD, "{dir}", serverDir, 1))
@@ -59,12 +58,6 @@ func main() {
 		stderr := new(bytes.Buffer)
 		cmd.Stdout = stdout
 		cmd.Stderr = stderr
-
-		localDb, err := db.ParseFile()
-		assert(err, "Error parsing db file: %s\n", err)
-
-		err = localDb.Update()
-		assert(err, "Error updating local db: %s\n", err)
 
 		err = cmd.Start()
 		assert(err, stderr.String())
@@ -117,6 +110,19 @@ func main() {
 
 		cmdLoop(string(bs))
 	}
+}
+
+func getLocalDb(clientDir string) *TraDb {
+	err := os.Chdir(clientDir)
+	assert(err, "Error changing to directory: %s\n", err)
+
+	localDb, err := db.ParseFile()
+	assert(err, "Error parsing db file: %s\n", err)
+
+	err = localDb.Update()
+	assert(err, "Error updating local db: %s\n", err)
+
+	return localDb
 }
 
 func readStdout(stdout *bytes.Buffer, outChan chan string) string {
