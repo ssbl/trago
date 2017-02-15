@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/ssbl/trago/db"
 )
@@ -18,6 +19,7 @@ import (
 const (
 	SERVFLAG = "-s"
 	SERVCMD = "trago -s {dir}"
+	TIMEOUT = time.Second * 5
 	serverUsage = "Run in server mode in the specified directory.\n"
 )
 
@@ -71,8 +73,17 @@ func main() {
 		_, err = stdin.Write([]byte("get\n"))
 		assert(err, "Error writing to pipe: %s\n", err)
 
-		fmt.Println("waiting for reply")
-		out := readStdout(stdout)
+		outChan := make(chan string)
+		go readStdout(stdout, outChan)
+
+		var out string
+		select {
+			case data := <-outChan:
+			out = data
+
+			case <-time.After(TIMEOUT):
+			log.Fatal("Server timed out\n")
+		}
 
 		remoteDb, err := db.Parse(out)
 		assert(err, "Error parsing server response\n")
@@ -108,7 +119,7 @@ func main() {
 	}
 }
 
-func readStdout(stdout *bytes.Buffer) string {
+func readStdout(stdout *bytes.Buffer, outChan chan string) string {
 	var buf [512]byte
 	out := new(bytes.Buffer)
 
@@ -119,7 +130,7 @@ func readStdout(stdout *bytes.Buffer) string {
 		outStr := out.String()
 
 		if strings.HasSuffix(outStr, "\n\n\n") {
-			return outStr
+			outChan <- outStr
 		}
 	}
 }
@@ -137,7 +148,7 @@ func cmdLoop(db string) {
 
 		case "get":
 			fmt.Println(db)
-			fmt.Println("\n")
+			fmt.Print("\n\n")
 		}
 	}
 }
