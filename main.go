@@ -47,22 +47,11 @@ func main() {
 		fmt.Printf("%s:%s %s\n", server, serverDir, clientDir)
 
 		localDb := getLocalDb(clientDir)
+		cmd, stdin, stdout, stderr := startServer(server, serverDir)
 
-		cmd := exec.Command("ssh", server,
-			strings.Replace(SERVCMD, "{dir}", serverDir, 1))
-
-		stdin, err := cmd.StdinPipe()
-		assert(err, "Error creating pipe: %s\n", err)
-
-		stdout := new(bytes.Buffer)
-		stderr := new(bytes.Buffer)
-		cmd.Stdout = stdout
-		cmd.Stderr = stderr
-
-		err = cmd.Start()
+		err := cmd.Start()
 		assert(err, stderr.String())
 
-		fmt.Println("sending get")
 		_, err = stdin.Write([]byte("get\n"))
 		assert(err, "Error writing to pipe: %s\n", err)
 
@@ -112,7 +101,7 @@ func main() {
 	}
 }
 
-func getLocalDb(clientDir string) *TraDb {
+func getLocalDb(clientDir string) *db.TraDb {
 	err := os.Chdir(clientDir)
 	assert(err, "Error changing to directory: %s\n", err)
 
@@ -123,6 +112,23 @@ func getLocalDb(clientDir string) *TraDb {
 	assert(err, "Error updating local db: %s\n", err)
 
 	return localDb
+}
+
+func startServer(hostname string, serverDir string) (*exec.Cmd,
+	io.WriteCloser, *bytes.Buffer, *bytes.Buffer) {
+
+	cmdString := strings.Replace(SERVCMD, "{dir}", serverDir, 1)
+	cmd := exec.Command("ssh", hostname, cmdString)
+
+	stdin, err := cmd.StdinPipe()
+	assert(err, "Error creating pipe: %s\n", err)
+
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+
+	return cmd, stdin, stdout, stderr
 }
 
 func readStdout(stdout *bytes.Buffer, outChan chan string) string {
