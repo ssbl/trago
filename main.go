@@ -82,16 +82,9 @@ func main() {
 		stdin.Close()
 		fmt.Println(tags)
 	} else {	  // running in server mode, so we ignore all other flags
-		err := os.Chdir(flagDir)
-		assert(err, "Error changing to directory: %s\n", err)
+		tradb := getLocalDb(flagDir)
 
-		tradb, err := db.ParseFile()
-		assert(err, "Error parsing db file: %s\n", err)
-
-		err = tradb.Update()
-		assert(err, "Error updating db file: %s\n", err)
-
-		err = tradb.Write()
+		err := tradb.Write()
 		assert(err, "Error writing to db file: %s\n", err)
 
 		bs, err := ioutil.ReadFile(db.TRADB)
@@ -101,8 +94,8 @@ func main() {
 	}
 }
 
-func getLocalDb(clientDir string) *db.TraDb {
-	err := os.Chdir(clientDir)
+func getLocalDb(dir string) *db.TraDb {
+	err := os.Chdir(dir)
 	assert(err, "Error changing to directory: %s\n", err)
 
 	localDb, err := db.ParseFile()
