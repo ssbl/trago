@@ -19,7 +19,7 @@ import (
 const (
 	SERVFLAG = "-s"
 	SERVCMD = "trago -s {dir}"
-	TIMEOUT = time.Second * 5
+	TIMEOUT = time.Second * 12
 	serverUsage = "Run in server mode in the specified directory.\n"
 )
 
@@ -63,7 +63,10 @@ func main() {
 			case data := <-outChan:
 			out = data
 
-			case <-time.After(TIMEOUT):
+			case <-time.After(TIMEOUT): // resend once
+			_, err = stdin.Write([]byte("get\n"))
+
+			case <-time.After(TIMEOUT * 2):
 			log.Fatal("Server timed out\n")
 		}
 
@@ -75,6 +78,8 @@ func main() {
 
 		fmt.Println(remoteDb)
 		tags := localDb.Compare(remoteDb)
+
+		ingestTags(tags)
 
 		_, err = stdin.Write([]byte("quit\n"))
 		assert(err, "Error writing to pipe: %s\n", err)
@@ -91,6 +96,21 @@ func main() {
 		assert(err, "Error reading file: %s\n", err)
 
 		cmdLoop(string(bs))
+	}
+}
+
+func ingestTags(tags map[string]db.FileTag) {
+	for file, tag := range tags {
+		switch(tag) {
+			case db.File:
+			log.Printf("requesting file %s\n", file)
+
+			case db.Conflict:
+			log.Printf("conflict: file %s\n", file)
+
+			case db.Deleted:
+			case db.Directory:
+		}
 	}
 }
 
