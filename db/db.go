@@ -294,9 +294,9 @@ func combineVectors(v1 map[string]int, v2 map[string]int) {
 
 func isFileChanged(fs1 FileState, fs2 FileState) bool {
 	if fs1.MTime != fs2.MTime || fs1.Size != fs2.Size {
-		return false
+		return true
 	}
-	return true
+	return false
 }
 
 func checkError(err error) {
