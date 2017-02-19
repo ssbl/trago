@@ -1,6 +1,7 @@
 package db
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -15,6 +16,10 @@ const (
 	TRADB      = ".trago.db"
 	bytes      = "abcdefghijklmnopqrstuvwxyz1234567890"
 	currentDir = "./"
+)
+
+var (
+	FileNotFound = errors.New("Couldn't find .trago.db")
 )
 
 type TraDb struct {
@@ -112,11 +117,10 @@ func ParseFile() (*TraDb, error) {
 
 	dbfile, err := os.Open(TRADB)
 	if os.IsNotExist(err) {
-		log.Println("didn't find .trago.db")
+		log.Println(FileNotFound.Error())
 		tradb = New()
-		tradb.Write()
 
-		return tradb, nil
+		return tradb, FileNotFound
 	} else if err != nil {
 		return tradb, err
 	}
@@ -139,7 +143,7 @@ func New() *TraDb {
 	for i, _ := range replicaId {
 		replicaId[i] = bytes[rand.Intn(len(bytes))]
 	}
-	versionVector[string(replicaId)] = 1
+	versionVector[string(replicaId)] = 1 // TODO: check for duplicates
 
 	files, err := ioutil.ReadDir(currentDir)
 	checkError(err)

@@ -119,6 +119,9 @@ func getLocalDb(dir string) *db.TraDb {
 	assert(err, "Error changing to directory: %s\n", err)
 
 	localDb, err := db.ParseFile()
+	if err == db.FileNotFound {
+		return localDb
+	}
 	assert(err, "Error parsing db file: %s\n", err)
 
 	err = localDb.Update()
