@@ -19,6 +19,7 @@ import (
 const (
 	SERVFLAG = "-s"
 	SERVCMD = "trago -s {dir}"
+	RETRY_TIMEOUT = time.Second * 3
 	TIMEOUT = time.Second * 12
 	serverUsage = "Run in server mode in the specified directory.\n"
 )
@@ -63,10 +64,10 @@ func main() {
 			case data := <-outChan:
 			out = data
 
-			case <-time.After(TIMEOUT): // resend once
+			case <-time.After(RETRY_TIMEOUT): // resend once
 			_, err = stdin.Write([]byte("get\n"))
 
-			case <-time.After(TIMEOUT * 2):
+			case <-time.After(TIMEOUT):
 			log.Fatal("Server timed out\n")
 		}
 
