@@ -150,7 +150,8 @@ func New() *TraDb {
 
 	filemap := make(map[string]FileState)
 	for _, file := range files {
-		if file.IsDir() {
+		filename := file.Name()
+		if file.IsDir() || filename == TRADB {
 			continue // ignore directories for now
 		}
 		fs := FileState{
@@ -159,7 +160,7 @@ func New() *TraDb {
 			Version: 1,
 			Replica: string(replicaId),
 		}
-		filemap[file.Name()] = fs
+		filemap[filename] = fs
 	}
 
 	return &TraDb{string(replicaId), versionVector, filemap}
@@ -213,11 +214,11 @@ func (db *TraDb) Update() error {
 	ourVersion := db.VersionVec[db.ReplicaId]
 
 	for _, file := range files {
-		if file.IsDir() {
+		filename := file.Name()
+		if file.IsDir() || filename == TRADB {
 			continue
 		}
 
-		filename := file.Name()
 		dbRecord := db.Files[filename]
 		if dbRecord.MTime == 0 {
 			log.Printf("found a new file: %s\n", filename)
