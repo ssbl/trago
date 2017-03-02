@@ -174,6 +174,7 @@ func cmdLoop(db string) {
 		switch (strings.TrimSpace(msg)) {
 		case "quit":
 			fmt.Println("quitting")
+			return
 
 		case "get":
 			fmt.Println(db)
