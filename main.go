@@ -17,18 +17,18 @@ import (
 )
 
 const (
-	SERVFLAG = "-s"
-	SERVCMD = "trago -s {dir}"
+	SERVFLAG      = "-s"
+	SERVCMD       = "trago -s {dir}"
 	RETRY_TIMEOUT = time.Second * 3
-	TIMEOUT = time.Second * 12
-	serverUsage = "Run in server mode in the specified directory.\n"
+	TIMEOUT       = time.Second * 12
+	serverUsage   = "Run in server mode in the specified directory.\n"
 )
 
 var (
-	server string
-	serverDir string
-	clientDir string
-	flagDir string
+	server     string
+	serverDir  string
+	clientDir  string
+	flagDir    string
 	defaultDir = "(nil)"
 )
 
@@ -62,13 +62,13 @@ func main() {
 
 		var out string
 		select {
-			case data := <-outChan:
+		case data := <-outChan:
 			out = data
 
-			case <-time.After(RETRY_TIMEOUT): // resend once
+		case <-time.After(RETRY_TIMEOUT): // resend once
 			_, err = stdin.Write([]byte("get\n"))
 
-			case <-time.After(TIMEOUT):
+		case <-time.After(TIMEOUT):
 			log.Fatal("Server timed out\n")
 		}
 
@@ -87,7 +87,7 @@ func main() {
 		assert(err, "Error writing to pipe: %s\n", err)
 
 		fmt.Println(tags)
-	} else {	  // running in server mode, so we ignore all other flags
+	} else { // running in server mode, so we ignore all other flags
 		tradb := getLocalDb(flagDir)
 
 		err := tradb.Write()
@@ -245,7 +245,7 @@ func isServer() bool {
 func usage() {
 	log.Printf("Usage: trago <server>:<dir> <client-dir>\n\n")
 
-	log.Printf("-s <dir>, --server <dir>\n    %s\n", serverUsage);
+	log.Printf("-s <dir>, --server <dir>\n    %s\n", serverUsage)
 }
 
 func parseArgs() (string, string, string) {
