@@ -49,6 +49,7 @@ func main() {
 
 		localDb := getLocalDb(clientDir)
 		cmd, stdin, stdout, stderr := startServer(server, serverDir)
+		defer stdin.Close()
 
 		err := cmd.Start()
 		assert(err, stderr.String())
@@ -80,12 +81,11 @@ func main() {
 		fmt.Println(remoteDb)
 		tags := localDb.Compare(remoteDb)
 
-		ingestTags(tags)
+		ingestTags(tags, stdin, stdout, remoteDb)
 
 		_, err = stdin.Write([]byte("quit\n"))
 		assert(err, "Error writing to pipe: %s\n", err)
 
-		stdin.Close()
 		fmt.Println(tags)
 	} else {	  // running in server mode, so we ignore all other flags
 		tradb := getLocalDb(flagDir)
@@ -100,17 +100,35 @@ func main() {
 	}
 }
 
-func ingestTags(tags map[string]db.FileTag) {
+func ingestTags(tags map[string]db.FileTag,
+	stdin io.WriteCloser, stdout *bytes.Buffer, remoteDb *db.TraDb) {
 	for file, tag := range tags {
-		switch(tag) {
-			case db.File:
+		switch tag {
+		case db.File:
 			log.Printf("requesting file %s\n", file)
+			size := remoteDb.Files[file].Size
+			cmd := "file " + file + "\n"
+			stdin.Write([]byte(cmd))
 
-			case db.Conflict:
+			outChan := make(chan string)
+			go readStdoutFile(stdout, outChan, size)
+
+			var out string
+			select {
+			case data := <-outChan:
+				out = data
+				fmt.Printf("Got file %s (length %d)\n", file, len(out))
+
+			case <-time.After(TIMEOUT):
+				log.Printf("Skipping file %s (timeout)\n", file)
+				break
+			}
+
+		case db.Conflict:
 			log.Printf("conflict: file %s\n", file)
 
-			case db.Deleted:
-			case db.Directory:
+		case db.Deleted:
+		case db.Directory:
 		}
 	}
 }
@@ -148,6 +166,24 @@ func startServer(hostname string, serverDir string) (*exec.Cmd,
 	return cmd, stdin, stdout, stderr
 }
 
+func readStdoutFile(stdout *bytes.Buffer, outChan chan string, size int) string {
+	var buf [1024]byte
+	out := new(bytes.Buffer)
+
+	nread := 0
+	for {
+		n, _ := stdout.Read(buf[0:])
+
+		out.Write(buf[0:n])
+		outStr := out.String()
+		nread += n
+
+		if nread == size+len("\n\n") {
+			outChan <- outStr
+		}
+	}
+}
+
 func readStdout(stdout *bytes.Buffer, outChan chan string) string {
 	var buf [512]byte
 	out := new(bytes.Buffer)
@@ -171,15 +207,34 @@ func cmdLoop(db string) {
 			return
 		}
 
-		switch (strings.TrimSpace(msg)) {
+		msgParts := strings.Fields(strings.TrimSpace(msg))
+		if len(msgParts) == 0 {
+			return
+		}
+
+		command := msgParts[0]
+
+		switch command {
+		case "file":
+			if len(msgParts) != 2 {
+				break
+			}
+
+			filename := msgParts[1]
+			file, _ := os.Open(filename)
+			defer file.Close()
+
+			reader := bufio.NewReader(file)
+			if _, err := io.Copy(os.Stdout, reader); err != nil {
+				break
+			}
 		case "quit":
-			fmt.Println("quitting")
 			return
 
 		case "get":
 			fmt.Println(db)
-			fmt.Print("\n\n")
 		}
+		fmt.Print("\n\n")
 	}
 }
 
