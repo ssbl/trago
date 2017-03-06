@@ -96,7 +96,7 @@ func main() {
 		bs, err := ioutil.ReadFile(db.TRADB)
 		assert(err, "Error reading file: %s\n", err)
 
-		cmdLoop(string(bs))
+		cmdLoop(string(bs), tradb)
 	}
 }
 
@@ -200,7 +200,7 @@ func readStdout(stdout *bytes.Buffer, outChan chan string) string {
 	}
 }
 
-func cmdLoop(db string) {
+func cmdLoop(dbFile string, localDb *db.TraDb) {
 	for {
 		msg, err := bufio.NewReader(os.Stdin).ReadString('\n')
 		if err == io.EOF {
@@ -229,10 +229,12 @@ func cmdLoop(db string) {
 				break
 			}
 		case "quit":
+			err := localDb.Write()
+			assert(err, "Error writing to db file: %s\n", err)
 			return
 
 		case "get":
-			fmt.Println(db)
+			fmt.Println(dbFile)
 		}
 		fmt.Print("\n\n")
 	}
