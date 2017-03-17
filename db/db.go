@@ -46,6 +46,8 @@ const (
 )
 
 
+// Parses a TraDb structure.
+// Fails if the given string is not in the correct format.
 func Parse(data string) (*TraDb, error) {
 	tradb := &TraDb{}
 	versionVector := make(map[string]int)
@@ -112,6 +114,7 @@ func Parse(data string) (*TraDb, error) {
 	return tradb, nil
 }
 
+// Parses a TraDb from a file.
 func ParseFile() (*TraDb, error) {
 	tradb := &TraDb{}
 
@@ -135,6 +138,10 @@ func ParseFile() (*TraDb, error) {
 	return Parse(string(bs))
 }
 
+// Creates a new TraDb.
+// The replica ID is a random string, and the version
+// number is set to 1. Checks for files in the current
+// directory and stores relevant file state in a map.
 func New() *TraDb {
 	replicaId := make([]byte, 16)
 	versionVector := make(map[string]int)
@@ -166,6 +173,7 @@ func New() *TraDb {
 	return &TraDb{string(replicaId), versionVector, filemap}
 }
 
+// Writes a TraDb to the db file .trago.db.
 func (tradb *TraDb) Write() error {
 	var pairs []string
 
@@ -204,6 +212,8 @@ func (tradb *TraDb) Write() error {
 	return err
 }
 
+// Looks for modified files in the current directory
+// and updates the filemap accordingly.
 func (db *TraDb) Update() error {
 	files, err := ioutil.ReadDir(currentDir)
 	if err != nil {
@@ -240,6 +250,7 @@ func (db *TraDb) Update() error {
 	return nil
 }
 
+// Compares two TraDbs.
 func (local *TraDb) Compare(remote *TraDb) map[string]FileTag {
 	tags := make(map[string]FileTag)
 	remoteFiles := remote.Files
