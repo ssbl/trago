@@ -49,6 +49,11 @@ func (t *TraSrv) PutFile(data *db.FileData, reply *int) error {
 	return err
 }
 
+func (t *TraSrv) RemoveFile(filename *string, reply *int) error {
+	err := os.Remove(*filename)
+	return err
+}
+
 func (t *TraSrv) InitSrv(dir *string, reply *int) error {
 	err := os.Chdir(*dir)
 	if err != nil {

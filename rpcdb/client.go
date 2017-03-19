@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/rpc"
 	"net/http"
-	"os"
 
 	"github.com/ssbl/trago/db"
 )
@@ -65,9 +64,6 @@ func main() {
 				log.Fatal(err)
 			}
 			defer response.Body.Close()
-
-			fmt.Printf("Got file %s:\n", file)
-			io.Copy(os.Stdout, response.Body)
 
 			reply := 1
 			buf := new(bytes.Buffer)
