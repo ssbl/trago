@@ -2,9 +2,13 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"net/rpc"
+	"net/http"
+	"os"
 
 	"github.com/ssbl/trago/db"
 )
@@ -27,7 +31,6 @@ func main() {
 
 	err = startSrv(localClient, LOCALDIR)
 	if err != nil {
-		fmt.Println("failed here")
 		log.Fatal(err)
 	}
 	err = startSrv(remoteClient, REMOTEDIR)
@@ -53,9 +56,33 @@ func main() {
 	fmt.Printf("Reply from remote trasrv:\n%v\n", remoteDb)
 
 	fmt.Println("Comparing local with remote...")
-	fmt.Println(localDb.Compare(&remoteDb))
-	fmt.Println("Comparing remote with local...")
-	fmt.Println(remoteDb.Compare(&localDb))
+	tags := localDb.Compare(&remoteDb)
+
+	for file, tag := range tags {
+		if tag == db.File {
+			response, err := http.Get("http://localhost:8998/files/"+file)
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer response.Body.Close()
+
+			fmt.Printf("Got file %s:\n", file)
+			io.Copy(os.Stdout, response.Body)
+
+			reply := 1
+			buf := new(bytes.Buffer)
+			_, err = io.Copy(buf, response.Body)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			fileData := db.FileData{Name: file, Data: buf.Bytes()}
+			err = localClient.Call("TraSrv.PutFile", &fileData, &reply)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+	}
 }
 
 func startSrv(client *rpc.Client, dir string) error {

@@ -36,6 +36,11 @@ type FileState struct {
 	// TODO: use a hash as well
 }
 
+type FileData struct {
+	Name string
+	Data []byte
+}
+
 type FileTag uint8
 
 const (
@@ -259,7 +264,7 @@ func (local *TraDb) Compare(remote *TraDb) map[string]FileTag {
 		remoteState := remoteFiles[file]
 
 		if remoteState.Version == 0 { // file not present on server
-			if state.Version <= remote.VersionVec[state.Replica] {
+			if state.Version < remote.VersionVec[state.Replica] {
 				log.Printf("deleting: %s\n", file)
 				tags[file] = Deleted
 			}

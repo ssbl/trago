@@ -38,9 +38,22 @@ func (t *TraSrv) PutDb(args *db.TraDb, reply *int) error {
 	return nil
 }
 
+func (t *TraSrv) PutFile(data *db.FileData, reply *int) error {
+	file, err := os.Create(data.Name)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	_, err = file.Write(data.Data)
+	return err
+}
+
 func (t *TraSrv) InitSrv(dir *string, reply *int) error {
 	err := os.Chdir(*dir)
-	assert(err, "Error changing to directory: %s\n", err)
+	if err != nil {
+		return err
+	}
 
 	localDb, err = db.ParseFile()
 	if err == db.FileNotFound {
@@ -61,6 +74,8 @@ func main() {
 
 	port := ":" + os.Args[1]
 
+	http.Handle("/files/", http.StripPrefix("/files/",
+		http.FileServer(http.Dir("."))))
 	log.Fatal(http.ListenAndServe(port, nil))
 }
 
