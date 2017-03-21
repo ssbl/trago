@@ -58,6 +58,7 @@ func main() {
 	tags := localDb.Compare(&remoteDb)
 
 	for file, tag := range tags {
+		reply := 1
 		if tag == db.File {
 			response, err := http.Get("http://localhost:8998/files/"+file)
 			if err != nil {
@@ -65,7 +66,6 @@ func main() {
 			}
 			defer response.Body.Close()
 
-			reply := 1
 			buf := new(bytes.Buffer)
 			_, err = io.Copy(buf, response.Body)
 			if err != nil {
@@ -74,6 +74,11 @@ func main() {
 
 			fileData := db.FileData{Name: file, Data: buf.Bytes()}
 			err = localClient.Call("TraSrv.PutFile", &fileData, &reply)
+			if err != nil {
+				log.Fatal(err)
+			}
+		} else if tag == db.Deleted {
+			err = localClient.Call("TraSrv.RemoveFile", &file, &reply)
 			if err != nil {
 				log.Fatal(err)
 			}
