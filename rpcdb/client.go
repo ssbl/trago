@@ -84,6 +84,38 @@ func main() {
 			}
 		}
 	}
+
+	fmt.Println("Comparing remote with local...")
+	tags = remoteDb.Compare(&localDb)
+
+	for file, tag := range tags {
+		reply := 1
+		if tag == db.File {
+			response, err := http.Get("http://localhost:8999/files/"+file)
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer response.Body.Close()
+
+			buf := new(bytes.Buffer)
+			_, err = io.Copy(buf, response.Body)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			fileData := db.FileData{Name: file, Data: buf.Bytes()}
+			err = remoteClient.Call("TraSrv.PutFile", &fileData, &reply)
+			if err != nil {
+				log.Fatal(err)
+			}
+		} else if tag == db.Deleted {
+			err = remoteClient.Call("TraSrv.RemoveFile", &file, &reply)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+	}
+
 }
 
 func startSrv(client *rpc.Client, dir string) error {

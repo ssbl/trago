@@ -328,6 +328,7 @@ func hash(filename string) string {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer f.Close()
 
 	h := md5.New()
 	_, err = io.Copy(h, f)
