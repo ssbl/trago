@@ -1,8 +1,12 @@
 package db
 
 import (
+	"bytes"
+	"crypto/md5"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -14,7 +18,7 @@ import (
 
 const (
 	TRADB      = ".trago.db"
-	bytes      = "abcdefghijklmnopqrstuvwxyz1234567890"
+	chars      = "abcdefghijklmnopqrstuvwxyz1234567890"
 	currentDir = "./"
 )
 
@@ -33,7 +37,7 @@ type FileState struct {
 	MTime   int64
 	Version int
 	Replica string
-	// TODO: use a hash as well
+	Hash    string
 }
 
 type FileData struct {
@@ -94,7 +98,9 @@ func Parse(data string) (*TraDb, error) {
 				return tradb, err
 			}
 
-			tradb.Files[fields[1]] = FileState{size, mtime, ver, replicaId}
+			sum := fields[5]
+
+			tradb.Files[fields[1]] = FileState{size, mtime, ver, replicaId, sum}
 		case "version": // version r1:v1 r2:v2 ...
 			for _, entry := range fields[1:] {
 				pair := strings.Split(entry, ":") // replica:version pair
@@ -153,7 +159,7 @@ func New() *TraDb {
 
 	rand.Seed(time.Now().UTC().UnixNano())
 	for i, _ := range replicaId {
-		replicaId[i] = bytes[rand.Intn(len(bytes))]
+		replicaId[i] = chars[rand.Intn(len(chars))]
 	}
 	versionVector[string(replicaId)] = 1 // TODO: check for duplicates
 
@@ -171,6 +177,7 @@ func New() *TraDb {
 			MTime:   file.ModTime().UTC().UnixNano(),
 			Version: 1,
 			Replica: string(replicaId),
+			Hash:    hash(filename),
 		}
 		filemap[filename] = fs
 	}
@@ -200,12 +207,13 @@ func (tradb *TraDb) Write() error {
 	i := 0
 	for filename, info := range tradb.Files {
 		fileEntries[i] = fmt.Sprintf(
-			"file %s %d %d %s:%d",
+			"file %s %d %d %s:%d %s",
 			filename,
 			info.Size,
 			info.MTime,
 			info.Replica,
 			info.Version,
+			hash(filename),
 		)
 		i = i + 1
 	}
@@ -242,6 +250,7 @@ func (db *TraDb) Update() error {
 				MTime:   file.ModTime().UTC().UnixNano(),
 				Version: ourVersion,
 				Replica: db.ReplicaId,
+				Hash:    hash(filename),
 			}
 		} else if dbRecord.MTime < file.ModTime().UTC().UnixNano() {
 			log.Printf("found an updated file: %s\n", filename)
@@ -314,9 +323,30 @@ func combineVectors(v1 map[string]int, v2 map[string]int) {
 	}
 }
 
+func hash(filename string) string {
+	f, err := os.Open(filename)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	h := md5.New()
+	_, err = io.Copy(h, f)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return hex.EncodeToString(h.Sum(nil))
+}
+
 func isFileChanged(fs1 FileState, fs2 FileState) bool {
 	if fs1.MTime != fs2.MTime || fs1.Size != fs2.Size {
-		return true
+		h1, err1 := hex.DecodeString(fs1.Hash)
+		h2, err2 := hex.DecodeString(fs2.Hash)
+		if err1 != nil || err2 != nil {
+			log.Fatal(err1, err2)
+		}
+
+		return !bytes.Equal(h1, h2)
 	}
 	return false
 }
