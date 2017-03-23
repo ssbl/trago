@@ -304,12 +304,10 @@ func (local *TraDb) Compare(remote *TraDb) map[string]FileTag {
 		}
 	}
 
-	combineVectors(local.VersionVec, remote.VersionVec)
-	log.Println(local.VersionVec)
 	return tags
 }
 
-func combineVectors(v1 map[string]int, v2 map[string]int) {
+func CombineVectors(v1 map[string]int, v2 map[string]int) {
 	for replica, version := range v1 {
 		if v2[replica] > version {
 			v1[replica] = v2[replica]

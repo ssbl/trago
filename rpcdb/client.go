@@ -116,14 +116,14 @@ func main() {
 		}
 	}
 
+	db.CombineVectors(localDb.VersionVec, remoteDb.VersionVec)
+	remoteDb.VersionVec = localDb.VersionVec
+	fmt.Println(localDb.VersionVec, remoteDb.VersionVec)
 }
 
 func startSrv(client *rpc.Client, dir string) error {
 	var reply int
 
 	err := client.Call("TraSrv.InitSrv", &dir, &reply)
-	if err == db.FileNotFound {
-		return nil
-	}
 	return err
 }
