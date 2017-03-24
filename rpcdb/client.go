@@ -77,11 +77,14 @@ func main() {
 			if err != nil {
 				log.Fatal(err)
 			}
+
+			localDb.Files[file] = remoteDb.Files[file]
 		} else if tag == db.Deleted {
 			err = localClient.Call("TraSrv.RemoveFile", &file, &reply)
 			if err != nil {
 				log.Fatal(err)
 			}
+			delete(localDb.Files, file)
 		}
 	}
 
@@ -113,12 +116,20 @@ func main() {
 			if err != nil {
 				log.Fatal(err)
 			}
+			delete(remoteDb.Files, file)
 		}
 	}
 
 	db.CombineVectors(localDb.VersionVec, remoteDb.VersionVec)
 	remoteDb.VersionVec = localDb.VersionVec
 	fmt.Println(localDb.VersionVec, remoteDb.VersionVec)
+
+	if err := localClient.Call("TraSrv.PutDb", &localDb, &args); err != nil {
+		log.Fatal(err)
+	}
+	if err := remoteClient.Call("TraSrv.PutDb", &remoteDb, &args); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func startSrv(client *rpc.Client, dir string) error {

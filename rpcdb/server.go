@@ -35,6 +35,13 @@ func (t *TraSrv) GetDb(args *int, reply *db.TraDb) error {
 func (t *TraSrv) PutDb(args *db.TraDb, reply *int) error {
 	localDb = &db.TraDb{}
 	*localDb = *args
+
+	if err := localDb.UpdateMTimes(); err != nil {
+		return err
+	} else if err := localDb.Write(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -65,6 +72,13 @@ func (t *TraSrv) InitSrv(dir *string, reply *int) error {
 		initialized = true
 		return nil
 	} else if err != nil {
+		return err
+	}
+
+	localDb.VersionVec[localDb.ReplicaId] += 1
+
+	log.Println(localDb)
+	if err := localDb.Update(); err != nil {
 		return err
 	}
 

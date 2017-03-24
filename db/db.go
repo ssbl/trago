@@ -76,8 +76,8 @@ func Parse(data string) (*TraDb, error) {
 		}
 
 		switch fields[0] {
-		case "file": // file name size mtime replica:version
-			if len(fields) != 5 {
+		case "file": // file name size mtime replica:version hash
+			if len(fields) != 6 {
 				continue
 			}
 
@@ -233,7 +233,8 @@ func (db *TraDb) Update() error {
 		return err
 	}
 
-	db.VersionVec[db.ReplicaId] += 1
+	// db.VersionVec[db.ReplicaId] += 1
+	visitedFiles := make(map[string]bool)
 	ourVersion := db.VersionVec[db.ReplicaId]
 
 	for _, file := range files {
@@ -243,7 +244,7 @@ func (db *TraDb) Update() error {
 		}
 
 		dbRecord := db.Files[filename]
-		if dbRecord.MTime == 0 {
+		if dbRecord.Version == 0 {
 			log.Printf("found a new file: %s\n", filename)
 			db.Files[filename] = FileState{
 				Size:    int(file.Size()),
@@ -256,8 +257,19 @@ func (db *TraDb) Update() error {
 			log.Printf("found an updated file: %s\n", filename)
 			dbRecord.MTime = file.ModTime().UTC().UnixNano()
 			dbRecord.Version = ourVersion
+			dbRecord.Replica = db.ReplicaId
+			dbRecord.Hash = hash(filename)
+			db.Files[filename] = dbRecord
 		} else {
 			log.Printf("file unchanged: %s\n", filename)
+		}
+		visitedFiles[filename] = true
+	}
+
+	// Check for deleted files.
+	for filename, _ := range db.Files {
+		if !visitedFiles[filename] {
+			log.Printf("update: deleting entry for %s\n", filename)
 		}
 	}
 
@@ -305,6 +317,29 @@ func (local *TraDb) Compare(remote *TraDb) map[string]FileTag {
 	}
 
 	return tags
+}
+
+func (db *TraDb) UpdateMTimes() error {
+	files, err := ioutil.ReadDir(currentDir)
+	if err != nil {
+		return err
+	}
+
+	for _, file := range files {
+		filename := file.Name()
+		if file.IsDir() || filename == TRADB {
+			continue
+		}
+
+		dbRecord := db.Files[filename]
+		if mtime := file.ModTime().UTC().UnixNano(); mtime > dbRecord.MTime {
+			log.Printf("updating mtime: %s\n", filename)
+			dbRecord.MTime = mtime
+			db.Files[filename] = dbRecord
+		}
+	}
+
+	return nil
 }
 
 func CombineVectors(v1 map[string]int, v2 map[string]int) {
