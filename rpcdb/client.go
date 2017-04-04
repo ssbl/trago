@@ -85,6 +85,11 @@ func main() {
 				log.Fatal(err)
 			}
 			delete(localDb.Files, file)
+		} else if tag == db.Conflict {
+			err = localClient.Call("TraSrv.ShowConflict", &file, &reply)
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
 	}
 
@@ -117,6 +122,11 @@ func main() {
 				log.Fatal(err)
 			}
 			delete(remoteDb.Files, file)
+		} else if tag == db.Conflict {
+			err = remoteClient.Call("TraSrv.ShowConflict", &file, &reply)
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
 	}
 
