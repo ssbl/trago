@@ -1,11 +1,10 @@
 // tra
-package main
+package rpcdb
 
 import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"net/rpc"
 	"net/http"
 
@@ -13,35 +12,31 @@ import (
 )
 
 
-const (
-	LOCALDIR  = "../a"
-	REMOTEDIR = "../b"
-)	
+func Run(localDir, localAddr, remoteDir, remoteAddr string) error {
+	args := 1 					// unused arg variable
 
-func main() {
-	localClient, err := rpc.DialHTTP("tcp", "localhost:8999")
+	localClient, err := rpc.DialHTTP("tcp", localAddr)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
-	remoteClient, err := rpc.DialHTTP("tcp", "localhost:8998")
+	remoteClient, err := rpc.DialHTTP("tcp", remoteAddr)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
-	err = startSrv(localClient, LOCALDIR)
+	err = startSrv(localClient, localDir)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
-	err = startSrv(remoteClient, REMOTEDIR)
+	err = startSrv(remoteClient, remoteDir)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
-	args := 1
 	localDb := db.TraDb{}
 	err = localClient.Call("TraSrv.GetDb", &args, &localDb)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	fmt.Printf("Reply from local trasrv:\n%v\n", localDb)
@@ -49,7 +44,7 @@ func main() {
 	remoteDb := db.TraDb{}
 	err = remoteClient.Call("TraSrv.GetDb", &args, &remoteDb)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	fmt.Printf("Reply from remote trasrv:\n%v\n", remoteDb)
@@ -60,35 +55,36 @@ func main() {
 	for file, tag := range tags {
 		reply := 1
 		if tag == db.File {
-			response, err := http.Get("http://localhost:8998/files/"+file)
+			response, err := http.Get("http://"+remoteAddr+"/files/"+file)
 			if err != nil {
-				log.Fatal(err)
+				return err
 			}
 			defer response.Body.Close()
 
 			buf := new(bytes.Buffer)
 			_, err = io.Copy(buf, response.Body)
 			if err != nil {
-				log.Fatal(err)
+				return err
 			}
 
 			fileData := db.FileData{Name: file, Data: buf.Bytes()}
 			err = localClient.Call("TraSrv.PutFile", &fileData, &reply)
 			if err != nil {
-				log.Fatal(err)
+				return err
 			}
 
 			localDb.Files[file] = remoteDb.Files[file]
 		} else if tag == db.Deleted {
 			err = localClient.Call("TraSrv.RemoveFile", &file, &reply)
 			if err != nil {
-				log.Fatal(err)
+				return err
 			}
 			delete(localDb.Files, file)
 		} else if tag == db.Conflict {
+			// TODO: send the file with a different name
 			err = localClient.Call("TraSrv.ShowConflict", &file, &reply)
 			if err != nil {
-				log.Fatal(err)
+				return err
 			}
 		}
 	}
@@ -99,33 +95,33 @@ func main() {
 	for file, tag := range tags {
 		reply := 1
 		if tag == db.File {
-			response, err := http.Get("http://localhost:8999/files/"+file)
+			response, err := http.Get("http://"+localAddr+"/files/"+file)
 			if err != nil {
-				log.Fatal(err)
+				return err
 			}
 			defer response.Body.Close()
 
 			buf := new(bytes.Buffer)
 			_, err = io.Copy(buf, response.Body)
 			if err != nil {
-				log.Fatal(err)
+				return err
 			}
 
 			fileData := db.FileData{Name: file, Data: buf.Bytes()}
 			err = remoteClient.Call("TraSrv.PutFile", &fileData, &reply)
 			if err != nil {
-				log.Fatal(err)
+				return err
 			}
 		} else if tag == db.Deleted {
 			err = remoteClient.Call("TraSrv.RemoveFile", &file, &reply)
 			if err != nil {
-				log.Fatal(err)
+				return err
 			}
 			delete(remoteDb.Files, file)
 		} else if tag == db.Conflict {
 			err = remoteClient.Call("TraSrv.ShowConflict", &file, &reply)
 			if err != nil {
-				log.Fatal(err)
+				return err
 			}
 		}
 	}
@@ -135,11 +131,13 @@ func main() {
 	fmt.Println(localDb.VersionVec, remoteDb.VersionVec)
 
 	if err := localClient.Call("TraSrv.PutDb", &localDb, &args); err != nil {
-		log.Fatal(err)
+		return err
 	}
 	if err := remoteClient.Call("TraSrv.PutDb", &remoteDb, &args); err != nil {
-		log.Fatal(err)
+		return err
 	}
+
+	return nil
 }
 
 func startSrv(client *rpc.Client, dir string) error {
