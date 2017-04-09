@@ -123,6 +123,11 @@ func Run(localDir, localAddr, remoteDir, remoteAddr string) error {
 			if err != nil {
 				return err
 			}
+		} else if tag == db.Conflict {
+			err = remoteClient.Call("TraSrv.ShowConflict", &file, &reply)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
