@@ -95,6 +95,10 @@ func main() {
 	rpc.Register(trasrv)
 	rpc.HandleHTTP()
 
+	if (len(os.Args) != 2) {
+		log.Fatal("No port specified")
+	}
+
 	port := ":" + os.Args[1]
 
 	http.Handle("/files/", http.StripPrefix("/files/",
