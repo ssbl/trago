@@ -61,7 +61,7 @@ func (t *TraSrv) RemoveFile(filename *string, reply *int) error {
 }
 
 func (t *TraSrv) ShowConflict(filename *string, reply *int) error {
-	log.Printf("Conflict: %s\n", filename)
+	log.Printf("Conflict: %s\n", *filename)
 	return nil
 }
 

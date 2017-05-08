@@ -81,7 +81,6 @@ func Run(localDir, localAddr, remoteDir, remoteAddr string) error {
 			}
 			delete(localDb.Files, file)
 		} else if tag == db.Conflict {
-			// TODO: send the file with a different name
 			err = localClient.Call("TraSrv.ShowConflict", &file, &reply)
 			if err != nil {
 				return err
