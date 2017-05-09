@@ -13,7 +13,7 @@ import (
 
 
 func Run(localDir, localAddr, remoteDir, remoteAddr string) error {
-	args := 1 					// unused arg variable
+	var args int 					// unused arg variable
 
 	localClient, err := rpc.DialHTTP("tcp", localAddr)
 	if err != nil {
@@ -53,7 +53,6 @@ func Run(localDir, localAddr, remoteDir, remoteAddr string) error {
 	tags := localDb.Compare(&remoteDb)
 
 	for file, tag := range tags {
-		reply := 1
 		if tag == db.File {
 			response, err := http.Get("http://"+remoteAddr+"/files/"+file)
 			if err != nil {
@@ -75,13 +74,13 @@ func Run(localDir, localAddr, remoteDir, remoteAddr string) error {
 
 			localDb.Files[file] = remoteDb.Files[file]
 		} else if tag == db.Deleted {
-			err = localClient.Call("TraSrv.RemoveFile", &file, &reply)
+			err = localClient.Call("TraSrv.RemoveFile", &file, &args)
 			if err != nil {
 				return err
 			}
 			delete(localDb.Files, file)
 		} else if tag == db.Conflict {
-			err = localClient.Call("TraSrv.ShowConflict", &file, &reply)
+			err = localClient.Call("TraSrv.ShowConflict", &file, &args)
 			if err != nil {
 				return err
 			}
@@ -92,7 +91,6 @@ func Run(localDir, localAddr, remoteDir, remoteAddr string) error {
 	tags = remoteDb.Compare(&localDb)
 
 	for file, tag := range tags {
-		reply := 1
 		if tag == db.File {
 			response, err := http.Get("http://"+localAddr+"/files/"+file)
 			if err != nil {
@@ -112,13 +110,13 @@ func Run(localDir, localAddr, remoteDir, remoteAddr string) error {
 				return err
 			}
 		} else if tag == db.Deleted {
-			err = remoteClient.Call("TraSrv.RemoveFile", &file, &reply)
+			err = remoteClient.Call("TraSrv.RemoveFile", &file, &args)
 			if err != nil {
 				return err
 			}
 			delete(remoteDb.Files, file)
 		} else if tag == db.Conflict {
-			err = remoteClient.Call("TraSrv.ShowConflict", &file, &reply)
+			err = remoteClient.Call("TraSrv.ShowConflict", &file, &args)
 			if err != nil {
 				return err
 			}
