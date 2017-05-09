@@ -54,24 +54,9 @@ func Run(localDir, localAddr, remoteDir, remoteAddr string) error {
 
 	for file, tag := range tags {
 		if tag == db.File {
-			response, err := http.Get("http://"+remoteAddr+"/files/"+file)
-			if err != nil {
+			if err := sendFile(localClient, file, remoteAddr); err != nil {
 				return err
 			}
-			defer response.Body.Close()
-
-			buf := new(bytes.Buffer)
-			_, err = io.Copy(buf, response.Body)
-			if err != nil {
-				return err
-			}
-
-			fileData := db.FileData{Name: file, Data: buf.Bytes()}
-			err = localClient.Call("TraSrv.PutFile", &fileData, &reply)
-			if err != nil {
-				return err
-			}
-
 			localDb.Files[file] = remoteDb.Files[file]
 		} else if tag == db.Deleted {
 			err = localClient.Call("TraSrv.RemoveFile", &file, &args)
@@ -92,21 +77,7 @@ func Run(localDir, localAddr, remoteDir, remoteAddr string) error {
 
 	for file, tag := range tags {
 		if tag == db.File {
-			response, err := http.Get("http://"+localAddr+"/files/"+file)
-			if err != nil {
-				return err
-			}
-			defer response.Body.Close()
-
-			buf := new(bytes.Buffer)
-			_, err = io.Copy(buf, response.Body)
-			if err != nil {
-				return err
-			}
-
-			fileData := db.FileData{Name: file, Data: buf.Bytes()}
-			err = remoteClient.Call("TraSrv.PutFile", &fileData, &reply)
-			if err != nil {
+			if err := sendFile(remoteClient, file, localAddr); err != nil {
 				return err
 			}
 		} else if tag == db.Deleted {
@@ -141,5 +112,26 @@ func startSrv(client *rpc.Client, dir string) error {
 	var reply int
 
 	err := client.Call("TraSrv.InitSrv", &dir, &reply)
+	return err
+}
+
+func sendFile(client *rpc.Client, file string, addr string) error {
+	var reply int
+
+	response, err := http.Get("http://"+addr+"/files/"+file)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	buf := new(bytes.Buffer)
+	_, err = io.Copy(buf, response.Body)
+	if err != nil {
+		return err
+	}
+
+	fileData := db.FileData{Name: file, Data: buf.Bytes()}
+	err = client.Call("TraSrv.PutFile", &fileData, &reply)
+
 	return err
 }
