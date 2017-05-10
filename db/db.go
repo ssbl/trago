@@ -270,6 +270,7 @@ func (db *TraDb) Update() error {
 	for filename, _ := range db.Files {
 		if !visitedFiles[filename] {
 			log.Printf("update: deleting entry for %s\n", filename)
+			delete(db.Files, filename)
 		}
 	}
 
