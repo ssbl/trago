@@ -221,8 +221,7 @@ func (tradb *TraDb) Write() error {
 	entryString := strings.Join(fileEntries, "\n")
 	dataToWrite := []byte(preamble + entryString)
 
-	err := ioutil.WriteFile(TRADB, dataToWrite, 0644)
-	return err
+	return ioutil.WriteFile(TRADB, dataToWrite, 0644)
 }
 
 // Looks for modified files in the current directory

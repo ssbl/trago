@@ -40,8 +40,7 @@ func (t *TraSrv) PutDb(args *db.TraDb, reply *int) error {
 		return err
 	}
 
-	err := localDb.Write()
-	return err
+	return localDb.Write()
 }
 
 func (t *TraSrv) PutFile(data *db.FileData, reply *int) error {
@@ -56,8 +55,7 @@ func (t *TraSrv) PutFile(data *db.FileData, reply *int) error {
 }
 
 func (t *TraSrv) RemoveFile(filename *string, reply *int) error {
-	err := os.Remove(*filename)
-	return err
+	return os.Remove(*filename)
 }
 
 func (t *TraSrv) ShowConflict(filename *string, reply *int) error {

@@ -111,8 +111,7 @@ func Run(localDir, localAddr, remoteDir, remoteAddr string) error {
 func startSrv(client *rpc.Client, dir string) error {
 	var reply int
 
-	err := client.Call("TraSrv.InitSrv", &dir, &reply)
-	return err
+	return client.Call("TraSrv.InitSrv", &dir, &reply)
 }
 
 func sendFile(client *rpc.Client, file string, addr string) error {
@@ -131,7 +130,5 @@ func sendFile(client *rpc.Client, file string, addr string) error {
 	}
 
 	fileData := db.FileData{Name: file, Data: buf.Bytes()}
-	err = client.Call("TraSrv.PutFile", &fileData, &reply)
-
-	return err
+	return client.Call("TraSrv.PutFile", &fileData, &reply)
 }
