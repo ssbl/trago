@@ -103,9 +103,3 @@ func main() {
 		http.FileServer(http.Dir("."))))
 	log.Fatal(http.ListenAndServe(port, nil))
 }
-
-func assert(err error, format string, args ...interface{}) {
-	if err != nil {
-		log.Fatalf(format, args)
-	}
-}
