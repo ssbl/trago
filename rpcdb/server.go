@@ -88,12 +88,17 @@ func (t *TraSrv) InitDb(dir *string, reply *int) error {
 	return nil
 }
 
-func Start(port string) {
+func Start(port string) error {
 	trasrv := new(TraSrv)
-	rpc.Register(trasrv)
+
+	if err := rpc.Register(trasrv); err != nil {
+		return err
+	}
+
 	rpc.HandleHTTP()
 
 	http.Handle("/files/", http.StripPrefix("/files/",
 		http.FileServer(http.Dir("."))))
-	log.Fatal(http.ListenAndServe(port, nil))
+
+	return http.ListenAndServe(port, nil)
 }

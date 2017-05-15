@@ -63,7 +63,7 @@ func (t *TraSrv) ShowConflict(filename *string, reply *int) error {
 	return nil
 }
 
-func (t *TraSrv) InitSrv(dir *string, reply *int) error {
+func (t *TraSrv) InitDb(dir *string, reply *int) error {
 	err := os.Chdir(*dir)
 	if err != nil {
 		return err

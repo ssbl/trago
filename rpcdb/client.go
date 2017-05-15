@@ -111,7 +111,7 @@ func Run(localDir, localAddr, remoteDir, remoteAddr string) error {
 func startSrv(client *rpc.Client, dir string) error {
 	var reply int
 
-	return client.Call("TraSrv.InitSrv", &dir, &reply)
+	return client.Call("TraSrv.InitDb", &dir, &reply)
 }
 
 func sendFile(client *rpc.Client, file string, addr string) error {

@@ -15,6 +15,7 @@ const (
 	REMOTEDIR = "../b"
 	LOCALSRV  = "localhost:8999"
 	REMOTESRV = "localhost:8998"
+	PORT      = ":8999"
 )
 
 func init() {
@@ -27,10 +28,12 @@ func main() {
 	remoteServ, remoteDir, localDir := parseArgs()
 	log.Printf("%s:%s %s\n", remoteServ, remoteDir, localDir)
 
-	// TODO: Start trasrvs
-	// For now, we manually start two servers (server.go) on the ports above.
+	// TODO: Is this correct?
+	go rpcdb.Start(PORT)
 
-	if err := rpcdb.Run(LOCALDIR, LOCALSRV, REMOTEDIR, REMOTESRV); err != nil {
+	// TODO: Start the remote trasrv
+
+	if err := rpcdb.Run(localDir, LOCALSRV, REMOTEDIR, REMOTESRV); err != nil {
 		log.Fatal(err)
 	}
 }
