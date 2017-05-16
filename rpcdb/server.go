@@ -18,10 +18,6 @@ var (
 	initialized bool
 )
 
-const (
-	PORT = ":8999"
-)
-
 
 func (t *TraSrv) GetDb(args *int, reply *db.TraDb) error {
 	if !initialized {
