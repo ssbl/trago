@@ -84,7 +84,7 @@ func (t *TraSrv) InitDb(dir *string, reply *int) error {
 	return nil
 }
 
-func Start(port string) error {
+func StartSrv(port string) error {
 	trasrv := new(TraSrv)
 
 	if err := rpc.Register(trasrv); err != nil {

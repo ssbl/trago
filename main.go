@@ -29,7 +29,7 @@ func main() {
 	log.Printf("%s:%s %s\n", remoteServ, remoteDir, localDir)
 
 	// TODO: Is this correct?
-	go rpcdb.Start(PORT)
+	go rpcdb.StartSrv(PORT)
 
 	// TODO: Start the remote trasrv
 
