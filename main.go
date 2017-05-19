@@ -18,7 +18,13 @@ const (
 	PORT      = ":8999"
 )
 
+var (
+	serverMode bool
+)
+
 func init() {
+	flag.BoolVar(&serverMode, "s", false, "Run in server mode.\n")
+
 	flag.Usage = usage
 }
 
@@ -26,7 +32,8 @@ func main() {
 	flag.Parse()
 
 	remoteServ, remoteDir, localDir := parseArgs()
-	log.Printf("%s:%s %s\n", remoteServ, remoteDir, localDir)
+	log.Printf("%s:%s %s (server? %v)\n", remoteServ, remoteDir,
+		localDir, serverMode)
 
 	// TODO: Is this correct?
 	go rpcdb.StartSrv(PORT)
