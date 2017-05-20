@@ -31,6 +31,10 @@ func init() {
 func main() {
 	flag.Parse()
 
+	if serverMode {
+		rpcdb.StartSrv(":8998")
+	}
+
 	remoteServ, remoteDir, localDir := parseArgs()
 	log.Printf("%s:%s %s (server? %v)\n", remoteServ, remoteDir,
 		localDir, serverMode)
@@ -40,7 +44,7 @@ func main() {
 
 	// TODO: Start the remote trasrv
 
-	if err := rpcdb.Run(localDir, LOCALSRV, REMOTEDIR, REMOTESRV); err != nil {
+	if err := rpcdb.Run(localDir, LOCALSRV, remoteDir, REMOTESRV); err != nil {
 		log.Fatal(err)
 	}
 }
