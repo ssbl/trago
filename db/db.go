@@ -284,17 +284,17 @@ func (local *TraDb) Compare(remote *TraDb) map[string]FileTag {
 	for file, state := range local.Files {
 		remoteState := remoteFiles[file]
 
-		if remoteState.Version == 0 { // file not present on server
-			if state.Version < remote.VersionVec[state.Replica] {
+		if remoteState.Version == 0 { // file not on server
+			if state.Version <= remote.VersionVec[state.Replica] {
 				log.Printf("deleting: %s\n", file)
 				tags[file] = Deleted
+				continue
 			}
 		}
 
 		if isFileChanged(state, remoteState) {
 			if local.VersionVec[remoteState.Replica] >= remoteState.Version {
 				log.Printf("keeping: %s\n", file)
-				delete(tags, file) // in case we marked it for deletion
 			} else if remote.VersionVec[state.Replica] >= state.Version {
 				log.Printf("downloading: %s\n", file)
 				tags[file] = File
