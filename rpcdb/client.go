@@ -13,7 +13,8 @@ import (
 
 
 func Run(localDir, localAddr, remoteDir, remoteAddr string) error {
-	var args int 					// unused arg variable
+	var s    string
+	var args int				// unused arg variables
 
 	localClient, err := rpc.DialHTTP("tcp", localAddr)
 	if err != nil {
@@ -23,6 +24,7 @@ func Run(localDir, localAddr, remoteDir, remoteAddr string) error {
 	if err != nil {
 		return err
 	}
+	defer remoteClient.Call("TraSrv.StopSrv", &s, &args)
 
 	err = startSrv(localClient, localDir)
 	if err != nil {

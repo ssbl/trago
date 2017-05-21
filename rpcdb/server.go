@@ -84,6 +84,11 @@ func (t *TraSrv) InitDb(dir *string, reply *int) error {
 	return nil
 }
 
+func (t *TraSrv) StopSrv(arg *string, reply *int) error {
+	defer os.Exit(0)
+	return nil
+}
+
 func StartSrv(port string) error {
 	trasrv := new(TraSrv)
 

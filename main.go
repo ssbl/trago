@@ -4,18 +4,17 @@ import (
 	"flag"
 	"log"
 	"os"
+	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/ssbl/trago/rpcdb"
 )
 
 const (
-	// Test directories, addresses
-	LOCALDIR  = "../a"
-	REMOTEDIR = "../b"
 	LOCALSRV  = "localhost:8999"
-	REMOTESRV = "localhost:8998"
 	PORT      = ":8999"
+	SRVPORT   = ":8998"
 )
 
 var (
@@ -32,19 +31,26 @@ func main() {
 	flag.Parse()
 
 	if serverMode {
-		rpcdb.StartSrv(":8998")
+		rpcdb.StartSrv(SRVPORT)
 	}
 
-	remoteServ, remoteDir, localDir := parseArgs()
-	log.Printf("%s:%s %s (server? %v)\n", remoteServ, remoteDir,
-		localDir, serverMode)
+	remoteAddr, remoteDir, localDir := parseArgs()
 
 	// TODO: Is this correct?
 	go rpcdb.StartSrv(PORT)
 
-	// TODO: Start the remote trasrv
+	cmd := exec.Command("ssh", remoteAddr, "trago -s")
+	if err := cmd.Start(); err != nil {
+		log.Fatal(err)
+	}
 
-	if err := rpcdb.Run(localDir, LOCALSRV, remoteDir, REMOTESRV); err != nil {
+	// Wait for remote to start.
+	select {					// TODO: Find a better way to handle this
+		case <- time.After(2 * time.Second):
+	}
+
+	remoteServ := remoteAddr + SRVPORT
+	if err := rpcdb.Run(localDir, LOCALSRV, remoteDir, remoteServ); err != nil {
 		log.Fatal(err)
 	}
 }
