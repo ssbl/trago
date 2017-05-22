@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/rpc"
 	"net/http"
+	"sync"
 
 	"github.com/ssbl/trago/db"
 )
@@ -51,49 +52,68 @@ func Run(localDir, localAddr, remoteDir, remoteAddr string) error {
 
 	fmt.Printf("Reply from remote trasrv:\n%v\n", remoteDb)
 
-	fmt.Println("Comparing local with remote...")
-	tags := localDb.Compare(&remoteDb)
+	tags1 := localDb.Compare(&remoteDb)
+	tags2 := remoteDb.Compare(&localDb)
+	errch := make(chan error, 1)
+	var wg sync.WaitGroup
 
-	for file, tag := range tags {
-		if tag == db.File {
-			if err := sendFile(localClient, file, remoteAddr); err != nil {
-				return err
-			}
-			localDb.Files[file] = remoteDb.Files[file]
-		} else if tag == db.Deleted {
-			err = localClient.Call("TraSrv.RemoveFile", &file, &args)
-			if err != nil {
-				return err
-			}
-			delete(localDb.Files, file)
-		} else if tag == db.Conflict {
-			err = localClient.Call("TraSrv.ShowConflict", &file, &args)
-			if err != nil {
-				return err
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		for file, tag := range tags1 {
+			if tag == db.File {
+				if err := sendFile(localClient, file, remoteAddr); err != nil {
+					errch <- err
+					return
+				}
+				localDb.Files[file] = remoteDb.Files[file]
+			} else if tag == db.Deleted {
+				err = localClient.Call("TraSrv.RemoveFile", &file, &args)
+				if err != nil {
+					errch <- err
+					return
+				}
+				delete(localDb.Files, file)
+			} else if tag == db.Conflict {
+				err = localClient.Call("TraSrv.ShowConflict", &file, &args)
+				if err != nil {
+					errch <- err
+					return
+				}
 			}
 		}
-	}
+	}()
 
-	fmt.Println("Comparing remote with local...")
-	tags = remoteDb.Compare(&localDb)
-
-	for file, tag := range tags {
-		if tag == db.File {
-			if err := sendFile(remoteClient, file, localAddr); err != nil {
-				return err
-			}
-		} else if tag == db.Deleted {
-			err = remoteClient.Call("TraSrv.RemoveFile", &file, &args)
-			if err != nil {
-				return err
-			}
-			delete(remoteDb.Files, file)
-		} else if tag == db.Conflict {
-			err = remoteClient.Call("TraSrv.ShowConflict", &file, &args)
-			if err != nil {
-				return err
+	go func() {
+		defer wg.Done()
+		for file, tag := range tags2 {
+			if tag == db.File {
+				if err := sendFile(remoteClient, file, localAddr); err != nil {
+					errch <- err
+					return
+				}
+			} else if tag == db.Deleted {
+				err = remoteClient.Call("TraSrv.RemoveFile", &file, &args)
+				if err != nil {
+					errch <- err
+					return
+				}
+				delete(remoteDb.Files, file)
+			} else if tag == db.Conflict {
+				err = remoteClient.Call("TraSrv.ShowConflict", &file, &args)
+				if err != nil {
+					errch <- err
+					return
+				}
 			}
 		}
+	}()
+	wg.Wait()
+
+	select {
+		case err := <-errch:
+		    return err
+		default:
 	}
 
 	db.CombineVectors(localDb.VersionVec, remoteDb.VersionVec)
