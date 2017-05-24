@@ -60,53 +60,12 @@ func Run(localDir, localAddr, remoteDir, remoteAddr string) error {
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		for file, tag := range tags1 {
-			if tag == db.File {
-				if err := sendFile(localClient, file, remoteAddr); err != nil {
-					errch <- err
-					return
-				}
-				localDb.Files[file] = remoteDb.Files[file]
-			} else if tag == db.Deleted {
-				err = localClient.Call("TraSrv.RemoveFile", &file, &args)
-				if err != nil {
-					errch <- err
-					return
-				}
-				delete(localDb.Files, file)
-			} else if tag == db.Conflict {
-				err = localClient.Call("TraSrv.ShowConflict", &file, &args)
-				if err != nil {
-					errch <- err
-					return
-				}
-			}
-		}
+		processFileTags(localClient, localDb, remoteAddr, tags1, errch)
 	}()
 
 	go func() {
 		defer wg.Done()
-		for file, tag := range tags2 {
-			if tag == db.File {
-				if err := sendFile(remoteClient, file, localAddr); err != nil {
-					errch <- err
-					return
-				}
-			} else if tag == db.Deleted {
-				err = remoteClient.Call("TraSrv.RemoveFile", &file, &args)
-				if err != nil {
-					errch <- err
-					return
-				}
-				delete(remoteDb.Files, file)
-			} else if tag == db.Conflict {
-				err = remoteClient.Call("TraSrv.ShowConflict", &file, &args)
-				if err != nil {
-					errch <- err
-					return
-				}
-			}
-		}
+		processFileTags(remoteClient, remoteDb, localAddr, tags2, errch)
 	}()
 	wg.Wait()
 
@@ -128,6 +87,38 @@ func Run(localDir, localAddr, remoteDir, remoteAddr string) error {
 	}
 
 	return nil
+}
+
+func processFileTags(
+	client *rpc.Client,
+	tradb db.TraDb,
+	dest string,
+	tags map[string]db.FileTag,
+	errch chan error,
+) {
+	var args int
+
+	for file, tag := range tags {
+		if tag == db.File {
+			if err := sendFile(client, file, dest); err != nil {
+				errch <- err
+				return
+			}
+		} else if tag == db.Deleted {
+			err := client.Call("TraSrv.RemoveFile", &file, &args)
+			if err != nil {
+				errch <- err
+				return
+			}
+			delete(tradb.Files, file)
+		} else if tag == db.Conflict {
+			err := client.Call("TraSrv.ShowConflict", &file, &args)
+			if err != nil {
+				errch <- err
+				return
+			}
+		}
+	}
 }
 
 func startSrv(client *rpc.Client, dir string) error {
