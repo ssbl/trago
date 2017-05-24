@@ -66,7 +66,7 @@ func (t *TraSrv) InitDb(dir *string, reply *int) error {
 	}
 
 	localDb, err = db.ParseFile()
-	if err == db.FileNotFound {
+	if err == db.ErrFileNotFound {
 		initialized = true
 		return nil
 	} else if err != nil {

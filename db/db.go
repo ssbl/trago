@@ -23,7 +23,7 @@ const (
 )
 
 var (
-	FileNotFound = errors.New("Couldn't find .trago.db")
+	ErrFileNotFound = errors.New("Couldn't find .trago.db")
 )
 
 type TraDb struct {
@@ -131,10 +131,10 @@ func ParseFile() (*TraDb, error) {
 
 	dbfile, err := os.Open(TRADB)
 	if os.IsNotExist(err) {
-		log.Println(FileNotFound.Error())
+		log.Println(ErrFileNotFound.Error())
 		tradb = New()
 
-		return tradb, FileNotFound
+		return tradb, ErrFileNotFound
 	} else if err != nil {
 		return tradb, err
 	}
