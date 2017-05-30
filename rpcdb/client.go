@@ -52,8 +52,15 @@ func Run(localDir, localAddr, remoteDir, remoteAddr string) error {
 
 	fmt.Printf("Reply from remote trasrv:\n%v\n", remoteDb)
 
-	tags1 := localDb.Compare(&remoteDb)
-	tags2 := remoteDb.Compare(&localDb)
+	tags1, err := localDb.Compare(&remoteDb)
+	if err != nil {
+		return err
+	}
+	tags2, err := remoteDb.Compare(&localDb)
+	if err != nil {
+		return err
+	}
+
 	errch := make(chan error, 1)
 	var wg sync.WaitGroup
 

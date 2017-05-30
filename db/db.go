@@ -82,19 +82,19 @@ func Parse(data string) (*TraDb, error) {
 
 			size, err := strconv.Atoi(fields[2])
 			if err != nil {
-				return tradb, err
+				return nil, err
 			}
 
 			mtime, err := strconv.ParseInt(fields[3], 10, 64)
 			if err != nil {
-				return tradb, err
+				return nil, err
 			}
 
 			pair := strings.Split(fields[4], ":")
 			replicaId := pair[0]
 			ver, err := strconv.Atoi(pair[1])
 			if err != nil {
-				return tradb, err
+				return nil, err
 			}
 
 			sum := fields[5]
@@ -106,7 +106,7 @@ func Parse(data string) (*TraDb, error) {
 
 				v, err := strconv.Atoi(pair[1])
 				if err != nil {
-					return tradb, err
+					return nil, err
 				}
 
 				versionVector[pair[0]] = v
@@ -131,21 +131,24 @@ func ParseFile() (*TraDb, error) {
 	dbfile, err := os.Open(TRADB)
 	if os.IsNotExist(err) {
 		log.Println(ErrFileNotFound.Error())
-		tradb = New()
-
-		return tradb, ErrFileNotFound
+		tradb, err = New()
+		if err == nil {
+			return tradb, ErrFileNotFound
+		} else {
+			return nil, err
+		}
 	} else if err != nil {
-		return tradb, err
+		return nil, err
 	}
-
-	defer dbfile.Close()
+	defer func() { err = dbfile.Close() }()
 
 	bs, err := ioutil.ReadFile(TRADB)
 	if err != nil {
-		return tradb, err
+		return nil, err
 	}
 
-	return Parse(string(bs))
+	tradb, err = Parse(string(bs))
+	return tradb, err
 }
 
 // New creates a new TraDb.
@@ -153,7 +156,7 @@ func ParseFile() (*TraDb, error) {
 // The replica ID is a random string, and the version
 // number is set to 1. Checks for files in the current
 // directory and stores relevant file state in a map.
-func New() *TraDb {
+func New() (*TraDb, error) {
 	replicaId := make([]byte, 16)
 	versionVector := make(map[string]int)
 
@@ -164,7 +167,9 @@ func New() *TraDb {
 	versionVector[string(replicaId)] = 1 // TODO: check for duplicates
 
 	files, err := ioutil.ReadDir(currentDir)
-	checkError(err)
+	if err != nil {
+		return nil, err
+	}
 
 	filemap := make(map[string]FileState)
 	for _, file := range files {
@@ -172,17 +177,23 @@ func New() *TraDb {
 		if file.IsDir() || filename == TRADB {
 			continue // ignore directories for now
 		}
+
+		hashString, err := hash(filename)
+		if err != nil {
+			return nil, err
+		}
+
 		fs := FileState{
 			Size:    int(file.Size()),
 			MTime:   file.ModTime().UTC().UnixNano(),
 			Version: 1,
 			Replica: string(replicaId),
-			Hash:    hash(filename),
+			Hash:    hashString,
 		}
 		filemap[filename] = fs
 	}
 
-	return &TraDb{string(replicaId), versionVector, filemap}
+	return &TraDb{string(replicaId), versionVector, filemap}, nil
 }
 
 // Write writes a TraDb to the db file .trago.db.
@@ -206,6 +217,11 @@ func (tradb *TraDb) Write() error {
 
 	i := 0
 	for filename, info := range tradb.Files {
+		hashString, err := hash(filename)
+		if err != nil {
+			return err
+		}
+
 		fileEntries[i] = fmt.Sprintf(
 			"file %s %d %d %s:%d %s",
 			filename,
@@ -213,9 +229,9 @@ func (tradb *TraDb) Write() error {
 			info.MTime,
 			info.Replica,
 			info.Version,
-			hash(filename),
+			hashString,
 		)
-		i = i + 1
+		i++
 	}
 
 	entryString := strings.Join(fileEntries, "\n")
@@ -244,19 +260,30 @@ func (db *TraDb) Update() error {
 		dbRecord := db.Files[filename]
 		if dbRecord.Version == 0 {
 			log.Printf("found a new file: %s\n", filename)
+
+			hashString, err := hash(filename)
+			if err != nil {
+				return err
+			}
+
 			db.Files[filename] = FileState{
 				Size:    int(file.Size()),
 				MTime:   file.ModTime().UTC().UnixNano(),
 				Version: ourVersion,
 				Replica: db.ReplicaId,
-				Hash:    hash(filename),
+				Hash:    hashString,
 			}
 		} else if dbRecord.MTime < file.ModTime().UTC().UnixNano() {
 			log.Printf("found an updated file: %s\n", filename)
 			dbRecord.MTime = file.ModTime().UTC().UnixNano()
 			dbRecord.Version = ourVersion
 			dbRecord.Replica = db.ReplicaId
-			dbRecord.Hash = hash(filename)
+
+			hashString, err := hash(filename)
+			if err != nil {
+				return err
+			}
+			dbRecord.Hash = hashString
 			db.Files[filename] = dbRecord
 		} else {
 			log.Printf("file unchanged: %s\n", filename)
@@ -277,6 +304,7 @@ func (db *TraDb) Update() error {
 
 // Compare compares two TraDbs.
 // Returns a map which gives the FileTag for each changed file.
+func (local *TraDb) Compare(remote *TraDb) (map[string]FileTag, error) {
 	tags := make(map[string]FileTag)
 	remoteFiles := remote.Files
 
@@ -291,7 +319,12 @@ func (db *TraDb) Update() error {
 			}
 		}
 
-		if isFileChanged(state, remoteState) {
+		changed, err := isFileChanged(state, remoteState)
+		if err != nil {
+			return tags, err
+		}
+
+		if changed {
 			if local.VersionVec[remoteState.Replica] >= remoteState.Version {
 				log.Printf("keeping: %s\n", file)
 			} else if remote.VersionVec[state.Replica] >= state.Version {
@@ -315,7 +348,7 @@ func (db *TraDb) Update() error {
 		}
 	}
 
-	return tags
+	return tags, nil
 }
 
 func (db *TraDb) UpdateMTimes() error {
@@ -355,37 +388,35 @@ func CombineVectors(v1 map[string]int, v2 map[string]int) {
 	}
 }
 
-func hash(filename string) string {
+func hash(filename string) (string, error) {
 	f, err := os.Open(filename)
 	if err != nil {
-		log.Fatal(err)
+		return filename, err
 	}
-	defer f.Close()
+	defer func() { err = f.Close() }()
 
 	h := md5.New()
 	_, err = io.Copy(h, f)
 	if err != nil {
-		log.Fatal(err)
+		return filename, err
 	}
 
-	return hex.EncodeToString(h.Sum(nil))
+	return hex.EncodeToString(h.Sum(nil)), err
 }
 
-func isFileChanged(fs1 FileState, fs2 FileState) bool {
+func isFileChanged(fs1 FileState, fs2 FileState) (bool, error) {
 	if fs1.MTime != fs2.MTime || fs1.Size != fs2.Size {
-		h1, err1 := hex.DecodeString(fs1.Hash)
-		h2, err2 := hex.DecodeString(fs2.Hash)
-		if err1 != nil || err2 != nil {
-			log.Fatal(err1, err2)
+		h1, err := hex.DecodeString(fs1.Hash)
+		if err != nil {
+			return false, err
 		}
 
-		return !bytes.Equal(h1, h2)
-	}
-	return false
-}
+		h2, err := hex.DecodeString(fs2.Hash)
+		if err != nil {
+			return false, err
+		}
 
-func checkError(err error) {
-	if err != nil {
-		log.Fatal(err)
+		return !bytes.Equal(h1, h2), nil
 	}
+	return false, nil
 }
