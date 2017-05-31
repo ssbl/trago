@@ -19,7 +19,7 @@ import (
 const (
 	TRADB      = ".trago.db"
 	chars      = "abcdefghijklmnopqrstuvwxyz1234567890"
-	currentDir = "./"
+	currentDir = "."
 )
 
 var (
