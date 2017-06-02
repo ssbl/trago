@@ -5,25 +5,28 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"net/rpc"
 	"net/http"
+	"net/rpc"
 	"sync"
 
 	"github.com/ssbl/trago/db"
 )
 
-
 func Run(localDir, localAddr, remoteDir, remoteAddr string) error {
-	var s    string
-	var args int				// unused arg variables
+	// Placeholder variables for RPC calls.
+	var s string
+	var args int
 
 	localClient, err := rpc.DialHTTP("tcp", localAddr)
 	if err != nil {
 		return err
 	}
+
+	fmt.Println("Connecting to remote...")
+retry:
 	remoteClient, err := rpc.DialHTTP("tcp", remoteAddr)
 	if err != nil {
-		return err
+		goto retry
 	}
 	defer remoteClient.Call("TraSrv.StopSrv", &s, &args)
 
@@ -77,9 +80,9 @@ func Run(localDir, localAddr, remoteDir, remoteAddr string) error {
 	wg.Wait()
 
 	select {
-		case err := <-errch:
-		    return err
-		default:
+	case err := <-errch:
+		return err
+	default:
 	}
 
 	db.CombineVectors(localDb.VersionVec, remoteDb.VersionVec)
@@ -137,7 +140,7 @@ func startSrv(client *rpc.Client, dir string) error {
 func sendFile(client *rpc.Client, file string, addr string) error {
 	var reply int
 
-	response, err := http.Get("http://"+addr+"/files/"+file)
+	response, err := http.Get("http://" + addr + "/files/" + file)
 	if err != nil {
 		return err
 	}
