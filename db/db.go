@@ -88,7 +88,7 @@ func Parse(data string) (*TraDb, error) {
 
 		switch fields[0] {
 		case "file": // file name size mtime replica:version hash mode
-			if len(fields) != 6 {
+			if len(fields) != 7 {
 				continue
 			}
 
@@ -191,9 +191,16 @@ func New() (*TraDb, error) {
 	filemap := make(map[string]FileState)
 
 	for filename, file := range files {
-		hashString, err := hash(filename)
-		if err != nil {
-			return nil, err
+		var err error
+		var hashString string
+
+		if !file.IsDir() {
+			hashString, err = hash(filename)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			hashString = "[dir]"
 		}
 
 		fs := FileState{
@@ -230,13 +237,12 @@ func readDirRecursive(dir string, filemap map[string]os.FileInfo) error {
 	for _, fileinfo := range files {
 		name := filepath.Join(dir, fileinfo.Name())
 
+		filemap[name] = fileinfo
 		if fileinfo.IsDir() {
 			err := readDirRecursive(fileinfo.Name(), filemap)
 			if err != nil {
 				return err
 			}
-		} else {
-			filemap[name] = fileinfo
 		}
 	}
 
@@ -264,19 +270,27 @@ func (tradb *TraDb) Write() error {
 
 	i := 0
 	for filename, info := range tradb.Files {
-		hashString, err := hash(filename)
-		if err != nil {
-			return err
+		var err error
+		var hashString string
+
+		if mode := os.FileMode(info.Mode); mode.IsDir() {
+			hashString = "[dir]"
+		} else {
+			hashString, err = hash(filename)
+			if err != nil {
+				return err
+			}
 		}
 
 		fileEntries[i] = fmt.Sprintf(
-			"file %s %d %d %s:%d %s",
+			"file %s %d %d %s:%d %s %d",
 			filename,
 			info.Size,
 			info.MTime,
 			info.Replica,
 			info.Version,
 			hashString,
+			info.Mode,
 		)
 		i++
 	}
@@ -299,14 +313,21 @@ func (db *TraDb) Update() error {
 	ourVersion := db.VersionVec[db.ReplicaId]
 
 	for filename, file := range files {
-		dbRecord := db.Files[filename]
-		if dbRecord.Version == 0 {
-			log.Printf("found a new file: %s\n", filename)
+		var err error
+		var hashString string
 
-			hashString, err := hash(filename)
+		if file.IsDir() {
+			hashString = "[dir]"
+		} else {
+			hashString, err = hash(filename)
 			if err != nil {
 				return err
 			}
+		}
+
+		dbRecord := db.Files[filename]
+		if dbRecord.Version == 0 {
+			log.Printf("found a new file: %s\n", filename)
 
 			db.Files[filename] = FileState{
 				Size:    int(file.Size()),
@@ -320,12 +341,8 @@ func (db *TraDb) Update() error {
 			log.Printf("found an updated file: %s\n", filename)
 			dbRecord.MTime = file.ModTime().UTC().UnixNano()
 			dbRecord.Version = ourVersion
+			dbRecord.Mode = uint32(file.Mode())
 			dbRecord.Replica = db.ReplicaId
-
-			hashString, err := hash(filename)
-			if err != nil {
-				return err
-			}
 			dbRecord.Hash = hashString
 			db.Files[filename] = dbRecord
 		} else {
@@ -357,6 +374,10 @@ func (local *TraDb) Compare(remote *TraDb) (TagList, error) {
 	for file, state := range local.Files {
 		remoteState := remoteFiles[file]
 
+		if mode := os.FileMode(state.Mode); mode.IsDir() {
+			continue
+		}
+
 		if remoteState.Version == 0 { // file not on server
 			if state.Version <= remote.VersionVec[state.Replica] {
 				log.Printf("deleting: %s\n", file)
@@ -377,8 +398,8 @@ func (local *TraDb) Compare(remote *TraDb) (TagList, error) {
 				log.Printf("downloading: %s\n", file)
 				tags.Files[file] = File
 
-				dirTag := DirTag{Directory, remoteState.Mode}
-				tags.Dirs[filepath.Dir(file)] = dirTag
+				dir := filepath.Dir(file)
+				tags.Dirs[dir] = DirTag{Directory, remoteFiles[dir].Mode}
 			} else {
 				log.Printf("conflict: %s\n", file)
 				tags.Files[file] = Conflict
@@ -389,12 +410,18 @@ func (local *TraDb) Compare(remote *TraDb) (TagList, error) {
 	}
 
 	for file, state := range remoteFiles {
+		if mode := os.FileMode(state.Mode); mode.IsDir() {
+			continue
+		}
+
 		if local.Files[file].Version > 0 {
 			continue
 		} else if state.Version > local.VersionVec[state.Replica] {
 			log.Printf("downloading: %s\n", file)
 			tags.Files[file] = File
-			tags.Dirs[filepath.Dir(file)] = DirTag{Directory, state.Mode}
+
+			dir := filepath.Dir(file)
+			tags.Dirs[dir] = DirTag{Directory, remoteFiles[dir].Mode}
 		}
 	}
 
@@ -408,6 +435,10 @@ func (db *TraDb) UpdateMTimes() error {
 	}
 
 	for filename, file := range files {
+		if file.IsDir() {
+			continue
+		}
+
 		dbRecord := db.Files[filename]
 		if mtime := file.ModTime().UTC().UnixNano(); mtime > dbRecord.MTime {
 			log.Printf("updating mtime: %s\n", filename)

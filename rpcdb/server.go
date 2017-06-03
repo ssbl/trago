@@ -4,8 +4,8 @@ package rpcdb
 import (
 	"errors"
 	"log"
-	"net/rpc"
 	"net/http"
+	"net/rpc"
 	"os"
 
 	"github.com/ssbl/trago/db"
@@ -17,7 +17,6 @@ var (
 	localDb     *db.TraDb
 	initialized bool
 )
-
 
 func (t *TraSrv) GetDb(args *int, reply *db.TraDb) error {
 	if !initialized {
@@ -50,9 +49,9 @@ func (t *TraSrv) PutFile(data *db.FileData, reply *int) error {
 	return err
 }
 
-func (t *TraSrv) Mkdir(dirname *string, mode *os.FileMode) error {
-	log.Printf("Creating %s\n", *dirname)
-	err := os.Mkdir(*dirname, *mode)
+func (t *TraSrv) Mkdir(dirname *string, mode *uint32) error {
+	// TODO: Handle permission bits correctly.
+	err := os.Mkdir(*dirname, 0777)
 	if os.IsExist(err) {
 		return nil
 	}
