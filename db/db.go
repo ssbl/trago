@@ -11,6 +11,7 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -38,6 +39,7 @@ type FileState struct {
 	Version int
 	Replica string
 	Hash    string
+	Mode    uint32
 }
 
 type FileData struct {
@@ -46,6 +48,16 @@ type FileData struct {
 }
 
 type FileTag uint8
+
+type DirTag struct {
+	Tag  FileTag
+	Mode uint32
+}
+
+type TagList struct {
+	Files map[string]FileTag
+	Dirs  map[string]DirTag
+}
 
 const (
 	File = FileTag(iota)
@@ -75,7 +87,7 @@ func Parse(data string) (*TraDb, error) {
 		}
 
 		switch fields[0] {
-		case "file": // file name size mtime replica:version hash
+		case "file": // file name size mtime replica:version hash mode
 			if len(fields) != 6 {
 				continue
 			}
@@ -99,7 +111,12 @@ func Parse(data string) (*TraDb, error) {
 
 			sum := fields[5]
 
-			tradb.Files[fields[1]] = FileState{size, mtime, ver, replicaId, sum}
+			mode, err := strconv.ParseUint(fields[6], 10, 32)
+			if err != nil {
+				return nil, err
+			}
+
+			tradb.Files[fields[1]] = FileState{size, mtime, ver, replicaId, sum, uint32(mode)}
 		case "version": // version r1:v1 r2:v2 ...
 			for _, entry := range fields[1:] {
 				pair := strings.Split(entry, ":") // replica:version pair
@@ -166,18 +183,14 @@ func New() (*TraDb, error) {
 	}
 	versionVector[string(replicaId)] = 1 // TODO: check for duplicates
 
-	files, err := ioutil.ReadDir(currentDir)
+	files, err := readDir(currentDir)
 	if err != nil {
 		return nil, err
 	}
 
 	filemap := make(map[string]FileState)
-	for _, file := range files {
-		filename := file.Name()
-		if file.IsDir() || filename == TRADB {
-			continue // ignore directories for now
-		}
 
+	for filename, file := range files {
 		hashString, err := hash(filename)
 		if err != nil {
 			return nil, err
@@ -189,11 +202,45 @@ func New() (*TraDb, error) {
 			Version: 1,
 			Replica: string(replicaId),
 			Hash:    hashString,
+			Mode:    uint32(file.Mode()),
 		}
 		filemap[filename] = fs
 	}
 
 	return &TraDb{string(replicaId), versionVector, filemap}, nil
+}
+
+func readDir(dir string) (map[string]os.FileInfo, error) {
+	files := make(map[string]os.FileInfo)
+
+	if err := readDirRecursive(dir, files); err != nil {
+		return nil, err
+	}
+	delete(files, TRADB)
+
+	return files, nil
+}
+
+func readDirRecursive(dir string, filemap map[string]os.FileInfo) error {
+	files, err := ioutil.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+
+	for _, fileinfo := range files {
+		name := filepath.Join(dir, fileinfo.Name())
+
+		if fileinfo.IsDir() {
+			err := readDirRecursive(fileinfo.Name(), filemap)
+			if err != nil {
+				return err
+			}
+		} else {
+			filemap[name] = fileinfo
+		}
+	}
+
+	return nil
 }
 
 // Write writes a TraDb to the db file .trago.db.
@@ -243,7 +290,7 @@ func (tradb *TraDb) Write() error {
 // Update looks for modified files in the current directory
 // and updates the filemap accordingly.
 func (db *TraDb) Update() error {
-	files, err := ioutil.ReadDir(currentDir)
+	files, err := readDir(currentDir)
 	if err != nil {
 		return err
 	}
@@ -251,12 +298,7 @@ func (db *TraDb) Update() error {
 	visitedFiles := make(map[string]bool)
 	ourVersion := db.VersionVec[db.ReplicaId]
 
-	for _, file := range files {
-		filename := file.Name()
-		if file.IsDir() || filename == TRADB {
-			continue
-		}
-
+	for filename, file := range files {
 		dbRecord := db.Files[filename]
 		if dbRecord.Version == 0 {
 			log.Printf("found a new file: %s\n", filename)
@@ -272,6 +314,7 @@ func (db *TraDb) Update() error {
 				Version: ourVersion,
 				Replica: db.ReplicaId,
 				Hash:    hashString,
+				Mode:    uint32(file.Mode()),
 			}
 		} else if dbRecord.MTime < file.ModTime().UTC().UnixNano() {
 			log.Printf("found an updated file: %s\n", filename)
@@ -304,8 +347,11 @@ func (db *TraDb) Update() error {
 
 // Compare compares two TraDbs.
 // Returns a map which gives the FileTag for each changed file.
-func (local *TraDb) Compare(remote *TraDb) (map[string]FileTag, error) {
-	tags := make(map[string]FileTag)
+func (local *TraDb) Compare(remote *TraDb) (TagList, error) {
+	var tags TagList
+
+	tags.Dirs = make(map[string]DirTag)
+	tags.Files = make(map[string]FileTag)
 	remoteFiles := remote.Files
 
 	for file, state := range local.Files {
@@ -314,7 +360,7 @@ func (local *TraDb) Compare(remote *TraDb) (map[string]FileTag, error) {
 		if remoteState.Version == 0 { // file not on server
 			if state.Version <= remote.VersionVec[state.Replica] {
 				log.Printf("deleting: %s\n", file)
-				tags[file] = Deleted
+				tags.Files[file] = Deleted
 				continue
 			}
 		}
@@ -329,10 +375,13 @@ func (local *TraDb) Compare(remote *TraDb) (map[string]FileTag, error) {
 				log.Printf("keeping: %s\n", file)
 			} else if remote.VersionVec[state.Replica] >= state.Version {
 				log.Printf("downloading: %s\n", file)
-				tags[file] = File
+				tags.Files[file] = File
+
+				dirTag := DirTag{Directory, remoteState.Mode}
+				tags.Dirs[filepath.Dir(file)] = dirTag
 			} else {
 				log.Printf("conflict: %s\n", file)
-				tags[file] = Conflict
+				tags.Files[file] = Conflict
 			}
 		} else {
 			log.Printf("unchanged: %s\n", file)
@@ -344,7 +393,8 @@ func (local *TraDb) Compare(remote *TraDb) (map[string]FileTag, error) {
 			continue
 		} else if state.Version > local.VersionVec[state.Replica] {
 			log.Printf("downloading: %s\n", file)
-			tags[file] = File
+			tags.Files[file] = File
+			tags.Dirs[filepath.Dir(file)] = DirTag{Directory, state.Mode}
 		}
 	}
 
@@ -352,17 +402,12 @@ func (local *TraDb) Compare(remote *TraDb) (map[string]FileTag, error) {
 }
 
 func (db *TraDb) UpdateMTimes() error {
-	files, err := ioutil.ReadDir(currentDir)
+	files, err := readDir(currentDir)
 	if err != nil {
 		return err
 	}
 
-	for _, file := range files {
-		filename := file.Name()
-		if file.IsDir() || filename == TRADB {
-			continue
-		}
-
+	for filename, file := range files {
 		dbRecord := db.Files[filename]
 		if mtime := file.ModTime().UTC().UnixNano(); mtime > dbRecord.MTime {
 			log.Printf("updating mtime: %s\n", filename)

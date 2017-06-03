@@ -50,6 +50,15 @@ func (t *TraSrv) PutFile(data *db.FileData, reply *int) error {
 	return err
 }
 
+func (t *TraSrv) Mkdir(dirname *string, mode *os.FileMode) error {
+	log.Printf("Creating %s\n", *dirname)
+	err := os.Mkdir(*dirname, *mode)
+	if os.IsExist(err) {
+		return nil
+	}
+	return err
+}
+
 func (t *TraSrv) RemoveFile(filename *string, reply *int) error {
 	return os.Remove(*filename)
 }

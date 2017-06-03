@@ -103,12 +103,23 @@ func processFileTags(
 	client *rpc.Client,
 	tradb db.TraDb,
 	dest string,
-	tags map[string]db.FileTag,
+	tags db.TagList,
 	errch chan error,
 ) {
 	var args int
 
-	for file, tag := range tags {
+	for dir, tag := range tags.Dirs {
+		// TODO: Handle deleted directories.
+		if tag.Tag == db.Directory {
+			err := client.Call("TraSrv.Mkdir", &dir, &tag.Mode)
+			if err != nil {
+				errch <- err
+				return
+			}
+		}
+	}
+
+	for file, tag := range tags.Files {
 		if tag == db.File {
 			if err := sendFile(client, file, dest); err != nil {
 				errch <- err
