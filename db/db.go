@@ -45,22 +45,23 @@ type FileState struct {
 type FileData struct {
 	Name string
 	Data []byte
+	Mode uint32
 }
 
-type FileTag uint8
+type Label uint8
 
-type DirTag struct {
-	Tag  FileTag
-	Mode uint32
+type FileTag struct {
+	Label Label
+	Mode  uint32
 }
 
 type TagList struct {
 	Files map[string]FileTag
-	Dirs  map[string]DirTag
+	Dirs  map[string]FileTag
 }
 
 const (
-	File = FileTag(iota)
+	File = Label(iota)
 	Conflict
 	Directory
 	Deleted
@@ -367,7 +368,7 @@ func (db *TraDb) Update() error {
 func (local *TraDb) Compare(remote *TraDb) (TagList, error) {
 	var tags TagList
 
-	tags.Dirs = make(map[string]DirTag)
+	tags.Dirs = make(map[string]FileTag)
 	tags.Files = make(map[string]FileTag)
 	remoteFiles := remote.Files
 
@@ -381,7 +382,7 @@ func (local *TraDb) Compare(remote *TraDb) (TagList, error) {
 		if remoteState.Version == 0 { // file not on server
 			if state.Version <= remote.VersionVec[state.Replica] {
 				log.Printf("deleting: %s\n", file)
-				tags.Files[file] = Deleted
+				tags.Files[file] = FileTag{Deleted, 0}
 				continue
 			}
 		}
@@ -396,13 +397,13 @@ func (local *TraDb) Compare(remote *TraDb) (TagList, error) {
 				log.Printf("keeping: %s\n", file)
 			} else if remote.VersionVec[state.Replica] >= state.Version {
 				log.Printf("downloading: %s\n", file)
-				tags.Files[file] = File
+				tags.Files[file] = FileTag{File, remoteFiles[file].Mode}
 
 				dir := filepath.Dir(file)
-				tags.Dirs[dir] = DirTag{Directory, remoteFiles[dir].Mode}
+				tags.Dirs[dir] = FileTag{Directory, remoteFiles[dir].Mode}
 			} else {
 				log.Printf("conflict: %s\n", file)
-				tags.Files[file] = Conflict
+				tags.Files[file] = FileTag{Conflict, 0}
 			}
 		} else {
 			log.Printf("unchanged: %s\n", file)
@@ -418,10 +419,10 @@ func (local *TraDb) Compare(remote *TraDb) (TagList, error) {
 			continue
 		} else if state.Version > local.VersionVec[state.Replica] {
 			log.Printf("downloading: %s\n", file)
-			tags.Files[file] = File
+			tags.Files[file] = FileTag{File, remoteFiles[file].Mode}
 
 			dir := filepath.Dir(file)
-			tags.Dirs[dir] = DirTag{Directory, remoteFiles[dir].Mode}
+			tags.Dirs[dir] = FileTag{Directory, remoteFiles[dir].Mode}
 		}
 	}
 

@@ -38,20 +38,20 @@ func (t *TraSrv) PutDb(args *db.TraDb, reply *int) error {
 	return localDb.Write()
 }
 
-func (t *TraSrv) PutFile(data *db.FileData, reply *int) error {
-	file, err := os.Create(data.Name)
+func (t *TraSrv) PutFile(data *db.FileData, args *int) error {
+	perm := os.FileMode(data.Mode) & os.ModePerm
+	file, err := os.OpenFile(data.Name, os.O_CREATE | os.O_WRONLY, perm)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { err = file.Close() }()
 
 	_, err = file.Write(data.Data)
 	return err
 }
 
-func (t *TraSrv) Mkdir(dirname *string, mode *uint32) error {
-	// TODO: Handle permission bits correctly.
-	err := os.Mkdir(*dirname, 0777)
+func (t *TraSrv) Mkdir(dir *db.FileData, args *int) error {
+	err := os.Mkdir(dir.Name, os.FileMode(dir.Mode) & os.ModePerm)
 	if os.IsExist(err) {
 		return nil
 	}

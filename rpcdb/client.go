@@ -110,8 +110,10 @@ func processFileTags(
 
 	for dir, tag := range tags.Dirs {
 		// TODO: Handle deleted directories.
-		if tag.Tag == db.Directory {
-			err := client.Call("TraSrv.Mkdir", &dir, &tag.Mode)
+		// TODO: Create directories in the correct order.
+		if tag.Label == db.Directory {
+			dirData := db.FileData{Name: dir, Data: nil, Mode: tag.Mode}
+			err := client.Call("TraSrv.Mkdir", &dirData, &args)
 			if err != nil {
 				errch <- err
 				return
@@ -120,19 +122,21 @@ func processFileTags(
 	}
 
 	for file, tag := range tags.Files {
-		if tag == db.File {
-			if err := sendFile(client, file, dest); err != nil {
+		label := tag.Label
+
+		if label == db.File {
+			if err := sendFile(client, file, tag.Mode, dest); err != nil {
 				errch <- err
 				return
 			}
-		} else if tag == db.Deleted {
+		} else if label == db.Deleted {
 			err := client.Call("TraSrv.RemoveFile", &file, &args)
 			if err != nil {
 				errch <- err
 				return
 			}
 			delete(tradb.Files, file)
-		} else if tag == db.Conflict {
+		} else if label == db.Conflict {
 			err := client.Call("TraSrv.ShowConflict", &file, &args)
 			if err != nil {
 				errch <- err
@@ -148,8 +152,10 @@ func startSrv(client *rpc.Client, dir string) error {
 	return client.Call("TraSrv.InitDb", &dir, &reply)
 }
 
-func sendFile(client *rpc.Client, file string, addr string) error {
-	var reply int
+func sendFile(
+	client *rpc.Client, file string, mode uint32, addr string,
+) error {
+	var args int
 
 	response, err := http.Get("http://" + addr + "/files/" + file)
 	if err != nil {
@@ -163,6 +169,6 @@ func sendFile(client *rpc.Client, file string, addr string) error {
 		return err
 	}
 
-	fileData := db.FileData{Name: file, Data: buf.Bytes()}
-	return client.Call("TraSrv.PutFile", &fileData, &reply)
+	fileData := db.FileData{Name: file, Data: buf.Bytes(), Mode: mode}
+	return client.Call("TraSrv.PutFile", &fileData, &args)
 }
