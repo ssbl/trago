@@ -408,9 +408,6 @@ func (local *TraDb) Compare(remote *TraDb) (TagList, error) {
 			} else if remote.VersionVec[state.Replica] >= state.Version {
 				log.Printf("downloading: %s\n", file)
 				tags.Files[file] = FileTag{File, remoteFiles[file].Mode}
-
-				dir := filepath.Dir(file)
-				tags.Dirs[dir] = FileTag{Directory, remoteFiles[dir].Mode}
 			} else {
 				log.Printf("conflict: %s\n", file)
 				tags.Files[file] = FileTag{Conflict, 0}
@@ -421,18 +418,16 @@ func (local *TraDb) Compare(remote *TraDb) (TagList, error) {
 	}
 
 	for file, state := range remoteFiles {
-		if mode := os.FileMode(state.Mode); mode.IsDir() {
-			continue
-		}
-
 		if local.Files[file].Version > 0 {
 			continue
 		} else if state.Version > local.VersionVec[state.Replica] {
-			log.Printf("downloading new file: %s\n", file)
-			tags.Files[file] = FileTag{File, remoteFiles[file].Mode}
-
-			dir := filepath.Dir(file)
-			tags.Dirs[dir] = FileTag{Directory, remoteFiles[dir].Mode}
+			if mode := os.FileMode(state.Mode); mode.IsDir() {
+				log.Printf("new directory: %s\n", file)
+				tags.Dirs[file] = FileTag{Directory, remoteFiles[file].Mode}
+			} else {
+				log.Printf("downloading new file: %s\n", file)
+				tags.Files[file] = FileTag{File, remoteFiles[file].Mode}
+			}
 		}
 	}
 
