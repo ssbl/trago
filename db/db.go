@@ -240,7 +240,7 @@ func readDirRecursive(dir string, filemap map[string]os.FileInfo) error {
 
 		filemap[name] = fileinfo
 		if fileinfo.IsDir() {
-			err := readDirRecursive(fileinfo.Name(), filemap)
+			err := readDirRecursive(name, filemap)
 			if err != nil {
 				return err
 			}
