@@ -7,7 +7,8 @@ import (
 	"io"
 	"net/http"
 	"net/rpc"
-	"sync"
+	"path/filepath"
+	"strings"
 
 	"github.com/ssbl/trago/db"
 )
@@ -64,25 +65,13 @@ retry:
 		return err
 	}
 
-	errch := make(chan error, 1)
-	var wg sync.WaitGroup
-
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		processFileTags(localClient, localDb, remoteAddr, tags1, errch)
-	}()
-
-	go func() {
-		defer wg.Done()
-		processFileTags(remoteClient, remoteDb, localAddr, tags2, errch)
-	}()
-	wg.Wait()
-
-	select {
-	case err := <-errch:
+	err = checkTags(localClient, localDb, remoteAddr, tags1)
+	if err != nil {
 		return err
-	default:
+	}
+	err = checkTags(remoteClient, remoteDb, localAddr, tags2)
+	if err != nil {
+		return err
 	}
 
 	db.CombineVectors(localDb.VersionVec, remoteDb.VersionVec)
@@ -99,24 +88,34 @@ retry:
 	return nil
 }
 
-func processFileTags(
+func checkTags(
 	client *rpc.Client,
 	tradb db.TraDb,
 	dest string,
 	tags db.TagList,
-	errch chan error,
-) {
+) error {
 	var args int
 
-	for dir, tag := range tags.Dirs {
-		// TODO: Handle deleted directories.
-		// TODO: Create directories in the correct order.
-		if tag.Label == db.Directory {
-			dirData := db.FileData{Name: dir, Data: nil, Mode: tag.Mode}
-			err := client.Call("TraSrv.Mkdir", &dirData, &args)
-			if err != nil {
-				errch <- err
-				return
+	// Check if there are new directories.
+	// First get the directory depth.
+	maxDepth := 0
+	for dir, _ := range tags.Dirs {
+		depth := strings.Count(dir, string(filepath.Separator))
+		if depth > maxDepth {
+			maxDepth = depth
+		}
+	}
+	// TODO: Use a better algorithm!
+	for level := 0; level <= maxDepth; level++ {
+		for dir, tag := range tags.Dirs {
+			dirLevel := strings.Count(dir, string(filepath.Separator))
+			if tag.Label == db.Directory && dirLevel == level {
+				dirData := db.FileData{Name: dir, Data: nil, Mode: tag.Mode}
+				err := client.Call("TraSrv.PutDir", &dirData, &args)
+				if err != nil {
+					return err
+				}
+				delete(tags.Dirs, dir)
 			}
 		}
 	}
@@ -126,24 +125,40 @@ func processFileTags(
 
 		if label == db.File {
 			if err := sendFile(client, file, tag.Mode, dest); err != nil {
-				errch <- err
-				return
+				return err
 			}
 		} else if label == db.Deleted {
 			err := client.Call("TraSrv.RemoveFile", &file, &args)
 			if err != nil {
-				errch <- err
-				return
+				return err
 			}
 			delete(tradb.Files, file)
 		} else if label == db.Conflict {
 			err := client.Call("TraSrv.ShowConflict", &file, &args)
 			if err != nil {
-				errch <- err
-				return
+				return err
 			}
 		}
 	}
+
+	// Check if any directories have been deleted.
+	// These directories should be empty at this stage.
+	for level := maxDepth; level >= 0; level-- {
+		for dir, tag := range tags.Dirs {
+			dirLevel := strings.Count(dir, string(filepath.Separator))
+			if tag.Label == db.Deleted && dirLevel == level {
+				fmt.Println("deleting directory", dir)
+				dirData := db.FileData{Name: dir, Data: nil, Mode: 0}
+				err := client.Call("TraSrv.RemoveDir", &dirData, &args)
+				if err != nil {
+					return err
+				}
+				delete(tradb.Files, dir)
+			}
+		}
+	}
+
+	return nil
 }
 
 func startSrv(client *rpc.Client, dir string) error {

@@ -338,6 +338,9 @@ func (db *TraDb) Update() error {
 				Hash:    hashString,
 				Mode:    uint32(file.Mode()),
 			}
+		} else if file.IsDir() {
+			visitedFiles[filename] = true
+			continue
 		} else if dbRecord.MTime < file.ModTime().UTC().UnixNano() {
 			log.Printf("found an updated file: %s\n", filename)
 			dbRecord.MTime = file.ModTime().UTC().UnixNano()
@@ -352,7 +355,7 @@ func (db *TraDb) Update() error {
 		visitedFiles[filename] = true
 	}
 
-	// Check for deleted files.
+	// Check for deleted files and directories.
 	for filename, _ := range db.Files {
 		if !visitedFiles[filename] {
 			log.Printf("update: deleting entry for %s\n", filename)
@@ -364,7 +367,7 @@ func (db *TraDb) Update() error {
 }
 
 // Compare compares two TraDbs.
-// Returns a map which gives the FileTag for each changed file.
+// Returns a TagList which gives the FileTag for each changed file.
 func (local *TraDb) Compare(remote *TraDb) (TagList, error) {
 	var tags TagList
 
@@ -373,18 +376,25 @@ func (local *TraDb) Compare(remote *TraDb) (TagList, error) {
 	remoteFiles := remote.Files
 
 	for file, state := range local.Files {
+		isDir := os.FileMode(state.Mode).IsDir()
 		remoteState := remoteFiles[file]
 
-		if mode := os.FileMode(state.Mode); mode.IsDir() {
-			continue
-		}
-
-		if remoteState.Version == 0 { // file not on server
+		// File or directory doesn't exist on the remote replica.
+		if remoteState.Version == 0 {
 			if state.Version <= remote.VersionVec[state.Replica] {
 				log.Printf("deleting: %s\n", file)
-				tags.Files[file] = FileTag{Deleted, 0}
+
+				if isDir {
+					tags.Dirs[file] = FileTag{Deleted, 0}
+				} else {
+					tags.Files[file] = FileTag{Deleted, 0}
+				}
 				continue
 			}
+		}
+
+		if isDir {
+			continue
 		}
 
 		changed, err := isFileChanged(state, remoteState)
@@ -418,7 +428,7 @@ func (local *TraDb) Compare(remote *TraDb) (TagList, error) {
 		if local.Files[file].Version > 0 {
 			continue
 		} else if state.Version > local.VersionVec[state.Replica] {
-			log.Printf("downloading: %s\n", file)
+			log.Printf("downloading new file: %s\n", file)
 			tags.Files[file] = FileTag{File, remoteFiles[file].Mode}
 
 			dir := filepath.Dir(file)
