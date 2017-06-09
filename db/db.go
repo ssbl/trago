@@ -11,10 +11,11 @@ import (
 	"log"
 	"math/rand"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ssbl/trago/fs"
 )
 
 const (
@@ -184,11 +185,12 @@ func New() (*TraDb, error) {
 	}
 	versionVector[string(replicaId)] = 1 // TODO: check for duplicates
 
-	files, err := readDir(currentDir)
+	files, err := fs.ReadDir(currentDir)
 	if err != nil {
 		return nil, err
 	}
 
+	delete(files, TRADB)
 	filemap := make(map[string]FileState)
 
 	for filename, file := range files {
@@ -218,37 +220,6 @@ func New() (*TraDb, error) {
 	return &TraDb{string(replicaId), versionVector, filemap}, nil
 }
 
-func readDir(dir string) (map[string]os.FileInfo, error) {
-	files := make(map[string]os.FileInfo)
-
-	if err := readDirRecursive(dir, files); err != nil {
-		return nil, err
-	}
-	delete(files, TRADB)
-
-	return files, nil
-}
-
-func readDirRecursive(dir string, filemap map[string]os.FileInfo) error {
-	files, err := ioutil.ReadDir(dir)
-	if err != nil {
-		return err
-	}
-
-	for _, fileinfo := range files {
-		name := filepath.Join(dir, fileinfo.Name())
-
-		filemap[name] = fileinfo
-		if fileinfo.IsDir() {
-			err := readDirRecursive(name, filemap)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
 
 // Write writes a TraDb to the db file .trago.db.
 func (tradb *TraDb) Write() error {
@@ -305,10 +276,11 @@ func (tradb *TraDb) Write() error {
 // Update looks for modified files in the current directory
 // and updates the filemap accordingly.
 func (db *TraDb) Update() error {
-	files, err := readDir(currentDir)
+	files, err := fs.ReadDir(currentDir)
 	if err != nil {
 		return err
 	}
+	delete(files, TRADB)
 
 	visitedFiles := make(map[string]bool)
 	ourVersion := db.VersionVec[db.ReplicaId]
@@ -435,11 +407,12 @@ func (local *TraDb) Compare(remote *TraDb) (TagList, error) {
 }
 
 func (db *TraDb) UpdateMTimes() error {
-	files, err := readDir(currentDir)
+	files, err := fs.ReadDir(currentDir)
 	if err != nil {
 		return err
 	}
 
+	delete(files, TRADB)
 	for filename, file := range files {
 		if file.IsDir() {
 			continue
