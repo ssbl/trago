@@ -66,6 +66,7 @@ const (
 	Conflict
 	Directory
 	Deleted
+	DeletedLocally
 )
 
 // Parse parses a TraDb structure.
@@ -331,7 +332,9 @@ func (db *TraDb) Update() error {
 	for filename, _ := range db.Files {
 		if !visitedFiles[filename] {
 			log.Printf("update: deleting entry for %s\n", filename)
-			delete(db.Files, filename)
+			dbRecord := db.Files[filename]
+			dbRecord.Version = -1
+			db.Files[filename] = dbRecord
 		}
 	}
 
@@ -350,6 +353,16 @@ func (local *TraDb) Compare(remote *TraDb) (TagList, error) {
 	for file, state := range local.Files {
 		isDir := os.FileMode(state.Mode).IsDir()
 		remoteState := remoteFiles[file]
+
+		if state.Version == -1 {
+			if isDir {
+				log.Println("deleted locally:", file)
+				tags.Dirs[file] = FileTag{DeletedLocally, 0}
+			} else {
+				tags.Files[file] = FileTag{DeletedLocally, 0}
+			}
+			continue
+		}
 
 		// File or directory doesn't exist on the remote replica.
 		if remoteState.Version == 0 {
@@ -390,7 +403,16 @@ func (local *TraDb) Compare(remote *TraDb) (TagList, error) {
 	}
 
 	for file, state := range remoteFiles {
-		if local.Files[file].Version > 0 {
+		if local.Files[file].Version == -1 {
+			continue
+		} else if state.Version == -1 {
+			log.Printf("deleting: %s\n", file)
+			if mode := os.FileMode(state.Mode); mode.IsDir() {
+				tags.Dirs[file] = FileTag{Deleted, 0}
+			} else {
+				tags.Files[file] = FileTag{Deleted, 0}
+			}
+		} else if local.Files[file].Version > 0 {
 			continue
 		} else if state.Version > local.VersionVec[state.Replica] {
 			if mode := os.FileMode(state.Mode); mode.IsDir() {

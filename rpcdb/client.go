@@ -138,6 +138,8 @@ func checkTags(
 			if err != nil {
 				return err
 			}
+		} else if label == db.DeletedLocally {
+			delete(tradb.Files, file)
 		}
 	}
 
@@ -145,9 +147,12 @@ func checkTags(
 	// These directories should be empty at this stage.
 	for level := maxDepth; level >= 0; level-- {
 		for dir, tag := range tags.Dirs {
+			fmt.Println("deleting directory", dir)
 			dirLevel := strings.Count(dir, string(filepath.Separator))
+			if tag.Label == db.DeletedLocally {
+				delete(tradb.Files, dir)
+			}
 			if tag.Label == db.Deleted && dirLevel == level {
-				fmt.Println("deleting directory", dir)
 				dirData := db.FileData{Name: dir, Data: nil, Mode: 0}
 				err := client.Call("TraSrv.RemoveDir", &dirData, &args)
 				if err != nil {
