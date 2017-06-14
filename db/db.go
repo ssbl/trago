@@ -66,7 +66,6 @@ const (
 	Conflict
 	Directory
 	Deleted
-	DeletedLocally
 )
 
 // Parse parses a TraDb structure.
@@ -221,7 +220,6 @@ func New() (*TraDb, error) {
 	return &TraDb{string(replicaId), versionVector, filemap}, nil
 }
 
-
 // Write writes a TraDb to the db file .trago.db.
 func (tradb *TraDb) Write() error {
 	var pairs []string
@@ -311,10 +309,11 @@ func (db *TraDb) Update() error {
 				Hash:    hashString,
 				Mode:    uint32(file.Mode()),
 			}
-		} else if file.IsDir() {
+		} else if os.FileMode(dbRecord.Mode).IsDir() {
 			visitedFiles[filename] = true
 			continue
-		} else if dbRecord.MTime < file.ModTime().UTC().UnixNano() {
+		} else if dbRecord.MTime < file.ModTime().UTC().UnixNano() ||
+			os.FileMode(dbRecord.Mode) != file.Mode() & 0777 {
 			log.Printf("found an updated file: %s\n", filename)
 			dbRecord.MTime = file.ModTime().UTC().UnixNano()
 			dbRecord.Version = ourVersion
@@ -332,9 +331,7 @@ func (db *TraDb) Update() error {
 	for filename, _ := range db.Files {
 		if !visitedFiles[filename] {
 			log.Printf("update: deleting entry for %s\n", filename)
-			dbRecord := db.Files[filename]
-			dbRecord.Version = -1
-			db.Files[filename] = dbRecord
+			delete(db.Files, filename)
 		}
 	}
 
@@ -354,28 +351,17 @@ func (local *TraDb) Compare(remote *TraDb) (TagList, error) {
 		isDir := os.FileMode(state.Mode).IsDir()
 		remoteState := remoteFiles[file]
 
-		if state.Version == -1 {
-			if isDir {
-				log.Println("deleted locally:", file)
-				tags.Dirs[file] = FileTag{DeletedLocally, 0}
-			} else {
-				tags.Files[file] = FileTag{DeletedLocally, 0}
-			}
-			continue
-		}
-
 		// File or directory doesn't exist on the remote replica.
 		if remoteState.Version == 0 {
 			if state.Version <= remote.VersionVec[state.Replica] {
 				log.Printf("deleting: %s\n", file)
-
 				if isDir {
 					tags.Dirs[file] = FileTag{Deleted, 0}
 				} else {
 					tags.Files[file] = FileTag{Deleted, 0}
 				}
-				continue
 			}
+			continue
 		}
 
 		if isDir {
@@ -403,16 +389,7 @@ func (local *TraDb) Compare(remote *TraDb) (TagList, error) {
 	}
 
 	for file, state := range remoteFiles {
-		if local.Files[file].Version == -1 {
-			continue
-		} else if state.Version == -1 {
-			log.Printf("deleting: %s\n", file)
-			if mode := os.FileMode(state.Mode); mode.IsDir() {
-				tags.Dirs[file] = FileTag{Deleted, 0}
-			} else {
-				tags.Files[file] = FileTag{Deleted, 0}
-			}
-		} else if local.Files[file].Version > 0 {
+		if local.Files[file].Version > 0 {
 			continue
 		} else if state.Version > local.VersionVec[state.Replica] {
 			if mode := os.FileMode(state.Mode); mode.IsDir() {
@@ -482,6 +459,9 @@ func hash(filename string) (string, error) {
 }
 
 func isFileChanged(fs1 FileState, fs2 FileState) (bool, error) {
+	if fs1.Mode != fs2.Mode {
+		return true, nil
+	}
 	if fs1.MTime != fs2.MTime || fs1.Size != fs2.Size {
 		h1, err := hex.DecodeString(fs1.Hash)
 		if err != nil {

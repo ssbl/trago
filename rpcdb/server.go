@@ -40,11 +40,15 @@ func (t *TraSrv) PutDb(args *db.TraDb, reply *int) error {
 
 func (t *TraSrv) PutFile(data *db.FileData, args *int) error {
 	perm := os.FileMode(data.Mode) & os.ModePerm
-	file, err := os.OpenFile(data.Name, os.O_CREATE | os.O_WRONLY, perm)
+	file, err := os.OpenFile(data.Name, os.O_CREATE | os.O_WRONLY, 0755)
 	if err != nil {
 		return err
 	}
 	defer func() { err = file.Close() }()
+
+	if err := file.Chmod(perm); err != nil {
+		return err
+	}
 
 	_, err = file.Write(data.Data)
 	return err

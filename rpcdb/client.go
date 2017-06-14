@@ -138,8 +138,6 @@ func checkTags(
 			if err != nil {
 				return err
 			}
-		} else if label == db.DeletedLocally {
-			delete(tradb.Files, file)
 		}
 	}
 
@@ -149,9 +147,6 @@ func checkTags(
 		for dir, tag := range tags.Dirs {
 			fmt.Println("deleting directory", dir)
 			dirLevel := strings.Count(dir, string(filepath.Separator))
-			if tag.Label == db.DeletedLocally {
-				delete(tradb.Files, dir)
-			}
 			if tag.Label == db.Deleted && dirLevel == level {
 				dirData := db.FileData{Name: dir, Data: nil, Mode: 0}
 				err := client.Call("TraSrv.RemoveDir", &dirData, &args)
