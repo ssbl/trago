@@ -220,8 +220,8 @@ func New() (*TraDb, error) {
 	return &TraDb{string(replicaId), versionVector, filemap}, nil
 }
 
-// Write writes a TraDb to the db file .trago.db.
-func (tradb *TraDb) Write() error {
+// WriteToFile writes a TraDb to the db file .trago.db.
+func (tradb *TraDb) WriteToFile() error {
 	var pairs []string
 
 	for replicaId, version := range tradb.VersionVec {
@@ -313,7 +313,7 @@ func (db *TraDb) Update() error {
 			visitedFiles[filename] = true
 			continue
 		} else if dbRecord.MTime < file.ModTime().UTC().UnixNano() ||
-			os.FileMode(dbRecord.Mode) != file.Mode() & 0777 {
+			os.FileMode(dbRecord.Mode) != file.Mode()&0777 {
 			log.Printf("found an updated file: %s\n", filename)
 			dbRecord.MTime = file.ModTime().UTC().UnixNano()
 			dbRecord.Version = ourVersion
@@ -405,30 +405,7 @@ func (local *TraDb) Compare(remote *TraDb) (TagList, error) {
 	return tags, nil
 }
 
-func (db *TraDb) UpdateMTimes() error {
-	files, err := fs.ReadDir(currentDir)
-	if err != nil {
-		return err
-	}
-
-	delete(files, TRADB)
-	for filename, file := range files {
-		if file.IsDir() {
-			continue
-		}
-
-		dbRecord := db.Files[filename]
-		if mtime := file.ModTime().UTC().UnixNano(); mtime > dbRecord.MTime {
-			log.Printf("updating mtime: %s\n", filename)
-			dbRecord.MTime = mtime
-			db.Files[filename] = dbRecord
-		}
-	}
-
-	return nil
-}
-
-func CombineVectors(v1 map[string]int, v2 map[string]int) {
+func MergeVectors(v1 map[string]int, v2 map[string]int) {
 	for replica, version := range v1 {
 		if v2[replica] > version {
 			v1[replica] = v2[replica]

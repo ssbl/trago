@@ -65,16 +65,16 @@ retry:
 		return err
 	}
 
-	err = checkTags(localClient, localDb, remoteAddr, tags1)
+	err = checkTagsAndMerge(localClient, localDb, remoteDb, remoteAddr, tags1)
 	if err != nil {
 		return err
 	}
-	err = checkTags(remoteClient, remoteDb, localAddr, tags2)
+	err = checkTagsAndMerge(remoteClient, remoteDb, localDb, localAddr, tags2)
 	if err != nil {
 		return err
 	}
 
-	db.CombineVectors(localDb.VersionVec, remoteDb.VersionVec)
+	db.MergeVectors(localDb.VersionVec, remoteDb.VersionVec)
 	remoteDb.VersionVec = localDb.VersionVec
 	fmt.Println(localDb.VersionVec, remoteDb.VersionVec)
 
@@ -88,9 +88,10 @@ retry:
 	return nil
 }
 
-func checkTags(
+func checkTagsAndMerge(
 	client *rpc.Client,
 	tradb db.TraDb,
+	otherDb db.TraDb,
 	dest string,
 	tags db.TagList,
 ) error {
@@ -116,6 +117,7 @@ func checkTags(
 					return err
 				}
 				delete(tags.Dirs, dir)
+				tradb.Files[dir] = otherDb.Files[dir]
 			}
 		}
 	}
@@ -124,9 +126,10 @@ func checkTags(
 		label := tag.Label
 
 		if label == db.File {
-			if err := sendFile(client, file, tag.Mode, dest); err != nil {
+			if err := getFile(client, file, tag.Mode, dest); err != nil {
 				return err
 			}
+			tradb.Files[file] = otherDb.Files[file]
 		} else if label == db.Deleted {
 			err := client.Call("TraSrv.RemoveFile", &file, &args)
 			if err != nil {
@@ -167,7 +170,7 @@ func startSrv(client *rpc.Client, dir string) error {
 	return client.Call("TraSrv.InitDb", &dir, &reply)
 }
 
-func sendFile(
+func getFile(
 	client *rpc.Client, file string, mode uint32, addr string,
 ) error {
 	var args int

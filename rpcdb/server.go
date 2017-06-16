@@ -31,16 +31,12 @@ func (t *TraSrv) PutDb(args *db.TraDb, reply *int) error {
 	localDb = &db.TraDb{}
 	*localDb = *args
 
-	if err := localDb.UpdateMTimes(); err != nil {
-		return err
-	}
-
-	return localDb.Write()
+	return localDb.WriteToFile()
 }
 
 func (t *TraSrv) PutFile(data *db.FileData, args *int) error {
 	perm := os.FileMode(data.Mode) & os.ModePerm
-	file, err := os.OpenFile(data.Name, os.O_CREATE | os.O_WRONLY, 0755)
+	file, err := os.OpenFile(data.Name, os.O_CREATE|os.O_WRONLY, 0755)
 	if err != nil {
 		return err
 	}
@@ -55,7 +51,7 @@ func (t *TraSrv) PutFile(data *db.FileData, args *int) error {
 }
 
 func (t *TraSrv) PutDir(dir *db.FileData, args *int) error {
-	err := os.Mkdir(dir.Name, os.FileMode(dir.Mode) & os.ModePerm)
+	err := os.Mkdir(dir.Name, os.FileMode(dir.Mode)&os.ModePerm)
 	if os.IsExist(err) {
 		return nil
 	}
