@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/rpc"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -92,6 +93,8 @@ func checkTagsAndMerge(
 	tags db.TagList,
 ) error {
 	var args int
+	var err error
+	var dirs []string
 
 	// Check if there are new directories.
 	// First get the directory depth.
@@ -107,8 +110,17 @@ func checkTagsAndMerge(
 		for dir, tag := range tags.Dirs {
 			dirLevel := strings.Count(dir, string(filepath.Separator))
 			if tag.Label == db.Directory && dirLevel == level {
+				mode := os.FileMode(tradb.Files[dir].Mode)
+				if mode > 0 && !mode.IsDir() {
+					// File was changed to directory.
+					// Try to remove it and create the new directory.
+					err = client.Call("TraSrv.RemoveFile", &dir, &args)
+					if err != nil {
+						return err
+					}
+				}
 				dirData := db.FileData{Name: dir, Data: nil, Mode: tag.Mode}
-				err := client.Call("TraSrv.PutDir", &dirData, &args)
+				err = client.Call("TraSrv.PutDir", &dirData, &args)
 				if err != nil {
 					return err
 				}
@@ -119,25 +131,47 @@ func checkTagsAndMerge(
 	}
 
 	for file, tag := range tags.Files {
-		label := tag.Label
+		switch tag.Label {
+		case db.File:
+			if os.FileMode(tradb.Files[file].Mode).IsDir() {
+				// TODO: Find a better way to do this.
+				// Directory was changed to a file.
+				dirs = append(dirs, file)
+				continue
+			}
 
-		if label == db.File {
 			if err := getFile(client, file, tag.Mode, dest); err != nil {
 				return err
 			}
 			tradb.Files[file] = otherDb.Files[file]
-		} else if label == db.Deleted {
-			err := client.Call("TraSrv.RemoveFile", &file, &args)
+		case db.Deleted:
+			err = client.Call("TraSrv.RemoveFile", &file, &args)
 			if err != nil {
 				return err
 			}
 			delete(tradb.Files, file)
-		} else if label == db.Conflict {
-			err := client.Call("TraSrv.ShowConflict", &file, &args)
+		case db.Conflict:
+			err = client.Call("TraSrv.ShowConflict", &file, &args)
 			if err != nil {
 				return err
 			}
 		}
+	}
+
+	for _, dir := range dirs {
+		tag := tags.Files[dir]
+
+		dirData := db.FileData{Name: dir, Data: nil, Mode: 0}
+		err = client.Call("TraSrv.RemoveDir", &dirData, &args)
+		if err != nil {
+			return err
+		}
+
+		err = getFile(client, dir, tag.Mode, dest)
+		if err != nil {
+			return err
+		}
+		tradb.Files[dir] = otherDb.Files[dir]
 	}
 
 	// Check if any directories have been deleted.
@@ -147,7 +181,7 @@ func checkTagsAndMerge(
 			dirLevel := strings.Count(dir, string(filepath.Separator))
 			if tag.Label == db.Deleted && dirLevel == level {
 				dirData := db.FileData{Name: dir, Data: nil, Mode: 0}
-				err := client.Call("TraSrv.RemoveDir", &dirData, &args)
+				err = client.Call("TraSrv.RemoveDir", &dirData, &args)
 				if err != nil {
 					return err
 				}
@@ -158,7 +192,7 @@ func checkTagsAndMerge(
 
 	db.MergeVectors(tradb.VersionVec, otherDb.VersionVec)
 
-	return nil
+	return err
 }
 
 func startSrv(client *rpc.Client, dir string) error {

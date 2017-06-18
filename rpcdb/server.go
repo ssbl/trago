@@ -31,6 +31,10 @@ func (t *TraSrv) PutDb(args *db.TraDb, reply *int) error {
 	localDb = &db.TraDb{}
 	*localDb = *args
 
+	if err := localDb.UpdateMTimes(); err != nil {
+		return err
+	}
+
 	return localDb.WriteToFile()
 }
 

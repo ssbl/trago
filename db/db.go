@@ -299,7 +299,7 @@ func (db *TraDb) Update() error {
 				Hash:    hashString,
 				Mode:    uint32(file.Mode()),
 			}
-		} else if os.FileMode(dbRecord.Mode).IsDir() {
+		} else if file.IsDir() && os.FileMode(dbRecord.Mode).IsDir() {
 			visitedFiles[filename] = true
 			continue
 		} else if dbRecord.MTime < file.ModTime().UTC().UnixNano() ||
@@ -354,7 +354,7 @@ func (local *TraDb) Compare(remote *TraDb) (TagList, error) {
 			continue
 		}
 
-		if isDir {
+		if isDir && os.FileMode(remoteState.Mode).IsDir() {
 			continue
 		}
 
@@ -397,6 +397,28 @@ func (local *TraDb) Compare(remote *TraDb) (TagList, error) {
 	}
 
 	return tags, nil
+}
+
+func (db *TraDb) UpdateMTimes() error {
+	files, err := fs.ReadDir(currentDir)
+	if err != nil {
+		return err
+	}
+	delete(files, TRADB)
+
+	for file, fileInfo := range files {
+		if fileInfo.IsDir() {
+			continue
+		}
+
+		dbRecord := db.Files[file]
+		if mtime := fileInfo.ModTime().UTC().UnixNano(); mtime > dbRecord.MTime {
+			dbRecord.MTime = mtime
+			db.Files[file] = dbRecord
+		}
+	}
+
+	return nil
 }
 
 func MergeVectors(v1 map[string]int, v2 map[string]int) {
