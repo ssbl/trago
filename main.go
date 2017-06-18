@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	LOCALSRV = "localhost:8999"
 	PORT     = ":8999"
 	SRVPORT  = ":8998"
+	LOCALSRV = "localhost" + PORT
 )
 
 var (

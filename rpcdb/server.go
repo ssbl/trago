@@ -78,16 +78,12 @@ func (t *TraSrv) InitDb(dir *string, reply *int) error {
 	}
 
 	localDb, err = db.ParseFile()
-	if err == db.ErrFileNotFound {
-		initialized = true
-		return nil
-	} else if err != nil {
+	if err != nil {
 		return err
 	}
 
-	localDb.VersionVec[localDb.ReplicaId] += 1
+	localDb.VersionVec[localDb.ReplicaId]++
 
-	log.Println(localDb)
 	if err := localDb.Update(); err != nil {
 		return err
 	}

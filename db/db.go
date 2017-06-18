@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -22,10 +21,6 @@ const (
 	TRADB      = ".trago.db"
 	chars      = "abcdefghijklmnopqrstuvwxyz1234567890"
 	currentDir = "."
-)
-
-var (
-	ErrFileNotFound = errors.New("Couldn't find .trago.db")
 )
 
 type TraDb struct {
@@ -144,18 +139,13 @@ func Parse(data string) (*TraDb, error) {
 }
 
 // ParseFile parses a TraDb from the db file in the current directory.
+// If the file doesn't exist, a new TraDb is created using New.
 func ParseFile() (*TraDb, error) {
 	tradb := &TraDb{}
 
 	dbfile, err := os.Open(TRADB)
 	if os.IsNotExist(err) {
-		log.Println(ErrFileNotFound.Error())
-		tradb, err = New()
-		if err == nil {
-			return tradb, ErrFileNotFound
-		} else {
-			return nil, err
-		}
+		return New()
 	} else if err != nil {
 		return nil, err
 	}
@@ -313,7 +303,7 @@ func (db *TraDb) Update() error {
 			visitedFiles[filename] = true
 			continue
 		} else if dbRecord.MTime < file.ModTime().UTC().UnixNano() ||
-			os.FileMode(dbRecord.Mode) != file.Mode()&0777 {
+			os.FileMode(dbRecord.Mode) != file.Mode() {
 			log.Printf("found an updated file: %s\n", filename)
 			dbRecord.MTime = file.ModTime().UTC().UnixNano()
 			dbRecord.Version = ourVersion
@@ -378,7 +368,11 @@ func (local *TraDb) Compare(remote *TraDb) (TagList, error) {
 				log.Printf("keeping: %s\n", file)
 			} else if remote.VersionVec[state.Replica] >= state.Version {
 				log.Printf("downloading: %s\n", file)
-				tags.Files[file] = FileTag{File, remoteFiles[file].Mode}
+				if os.FileMode(remoteState.Mode).IsDir() {
+					tags.Dirs[file] = FileTag{Directory, remoteState.Mode}
+				} else {
+					tags.Files[file] = FileTag{File, remoteState.Mode}
+				}
 			} else {
 				log.Printf("conflict: %s\n", file)
 				tags.Files[file] = FileTag{Conflict, 0}

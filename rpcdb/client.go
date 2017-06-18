@@ -9,6 +9,7 @@ import (
 	"net/rpc"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/ssbl/trago/db"
 )
@@ -27,6 +28,7 @@ func Run(localDir, localAddr, remoteDir, remoteAddr string) error {
 retry:
 	remoteClient, err := rpc.DialHTTP("tcp", remoteAddr)
 	if err != nil {
+		time.Sleep(time.Second)
 		goto retry
 	}
 	defer remoteClient.Call("TraSrv.StopSrv", &s, &args)
@@ -46,20 +48,18 @@ retry:
 		return err
 	}
 
-	fmt.Printf("Reply from local trasrv:\n%v\n", localDb)
-
 	remoteDb := db.TraDb{}
 	err = remoteClient.Call("TraSrv.GetDb", &args, &remoteDb)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("Reply from remote trasrv:\n%v\n", remoteDb)
-
+	fmt.Println("Local vs remote:")
 	tags1, err := localDb.Compare(&remoteDb)
 	if err != nil {
 		return err
 	}
+	fmt.Println("Remote vs local:")
 	tags2, err := remoteDb.Compare(&localDb)
 	if err != nil {
 		return err
@@ -73,10 +73,6 @@ retry:
 	if err != nil {
 		return err
 	}
-
-	db.MergeVectors(localDb.VersionVec, remoteDb.VersionVec)
-	remoteDb.VersionVec = localDb.VersionVec
-	fmt.Println(localDb.VersionVec, remoteDb.VersionVec)
 
 	if err := localClient.Call("TraSrv.PutDb", &localDb, &args); err != nil {
 		return err
@@ -148,7 +144,6 @@ func checkTagsAndMerge(
 	// These directories should be empty at this stage.
 	for level := maxDepth; level >= 0; level-- {
 		for dir, tag := range tags.Dirs {
-			fmt.Println("deleting directory", dir)
 			dirLevel := strings.Count(dir, string(filepath.Separator))
 			if tag.Label == db.Deleted && dirLevel == level {
 				dirData := db.FileData{Name: dir, Data: nil, Mode: 0}
@@ -160,6 +155,8 @@ func checkTagsAndMerge(
 			}
 		}
 	}
+
+	db.MergeVectors(tradb.VersionVec, otherDb.VersionVec)
 
 	return nil
 }
