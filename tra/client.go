@@ -1,5 +1,5 @@
 // tra
-package rpcdb
+package tra
 
 import (
 	"bytes"

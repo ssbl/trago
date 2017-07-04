@@ -1,5 +1,5 @@
 // trasrv
-package rpcdb
+package tra
 
 import (
 	"errors"

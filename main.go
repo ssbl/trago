@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/ssbl/trago/rpcdb"
+	"github.com/ssbl/trago/tra"
 )
 
 const (
@@ -31,13 +31,13 @@ func main() {
 	flag.Parse()
 
 	if serverMode {
-		rpcdb.StartSrv(SRVPORT)
+		tra.StartSrv(SRVPORT)
 	}
 
 	remoteAddr, remoteDir, localDir := parseArgs()
 
 	// TODO: Is this correct?
-	go rpcdb.StartSrv(PORT)
+	go tra.StartSrv(PORT)
 
 	cmd := exec.Command("ssh", remoteAddr, "trago", "-s")
 	if err := cmd.Start(); err != nil {
@@ -45,7 +45,7 @@ func main() {
 	}
 
 	remoteServ := remoteAddr + SRVPORT
-	if err := rpcdb.Run(localDir, LOCALSRV, remoteDir, remoteServ); err != nil {
+	if err := tra.Run(localDir, LOCALSRV, remoteDir, remoteServ); err != nil {
 		log.Fatal(err)
 	}
 }
