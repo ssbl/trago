@@ -11,31 +11,29 @@ import (
 	"github.com/ssbl/trago/db"
 )
 
-type TraSrv int
-
-var (
+type TraSrv struct {
 	localDb     *db.TraDb
 	initialized bool
-)
+}
 
 func (t *TraSrv) GetDb(args *int, reply *db.TraDb) error {
-	if !initialized {
+	if !t.initialized {
 		return errors.New("uninitialized")
 	} else {
-		*reply = *localDb
+		*reply = *t.localDb
 		return nil
 	}
 }
 
 func (t *TraSrv) PutDb(args *db.TraDb, reply *int) error {
-	localDb = &db.TraDb{}
-	*localDb = *args
+	t.localDb = &db.TraDb{}
+	*t.localDb = *args
 
-	if err := localDb.UpdateMTimes(); err != nil {
+	if err := t.localDb.UpdateMTimes(); err != nil {
 		return err
 	}
 
-	return localDb.WriteToFile()
+	return t.localDb.WriteToFile()
 }
 
 func (t *TraSrv) PutFile(data *db.FileData, args *int) error {
@@ -81,18 +79,18 @@ func (t *TraSrv) InitDb(dir *string, reply *int) error {
 		return err
 	}
 
-	localDb, err = db.ParseFile()
+	t.localDb, err = db.ParseFile()
 	if err != nil {
 		return err
 	}
 
-	localDb.VersionVec[localDb.ReplicaId]++
+	t.localDb.VersionVec[t.localDb.ReplicaId]++
 
-	if err := localDb.Update(); err != nil {
+	if err := t.localDb.Update(); err != nil {
 		return err
 	}
 
-	initialized = true
+	t.initialized = true
 	return nil
 }
 

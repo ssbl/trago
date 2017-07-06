@@ -24,6 +24,7 @@ var (
 func init() {
 	flag.BoolVar(&serverMode, "s", false, "Run in server mode.\n")
 
+	log.SetFlags(0)
 	flag.Usage = usage
 }
 
