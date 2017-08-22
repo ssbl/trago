@@ -1,17 +1,25 @@
 # trago
 
 Trago is a file synchronization utility inspired by
-[tra](https://swtch.com/tra/).
+[tra](https://swtch.com/tra/). It uses the synchronization algorithm
+defined in the [tra paper](http://publications.csail.mit.edu/tmp/MIT-CSAIL-TR-2005-014.pdf).
 
-This is largely a work in progress. Right now, our local `trago`
-process spawns a remote process through ssh, and these instances
-communicate through their respective stdout/stdin.  The original `tra`
-creates a central master process (`tra`) and two identical `trasrv`
-processes. The `tra` process then handles the communication between
-the `trasrv`s through RPC.
+## Usage
 
-I hope to write that version someday, once I make this one a little
-less messy.
+Simply point it to a remote directory and a local directory, and
+trago will carry out a bidirectional sync.
 
-UPDATE: The RPC version seems to be coming along nicely! The old text-based
-protocol has been replaced.
+```
+    $ trago user@host:directory-A directory-B
+```
+
+## Caveats
+
+The design is simple, and borders on primitive in some areas:
+
+- moves and renames aren't detected
+- uses ssh to start the remote process
+- no per-directory worker threads
+- uses a fileserver to download files
+- files are transferred in their entirety
+- conflicting files are skipped
