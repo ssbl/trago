@@ -35,7 +35,7 @@ func main() {
 		tra.StartSrv(SRVPORT)
 	}
 
-	remoteAddr, remoteDir, localDir := parseArgs()
+	hostname, remoteAddr, remoteDir, localDir := parseArgs()
 
 	// TODO: Is this correct?
 	go tra.StartSrv(PORT)
@@ -45,18 +45,18 @@ func main() {
 		log.Fatal(err)
 	}
 
-	remoteServ := remoteAddr + SRVPORT
+	remoteServ := hostname + SRVPORT
 	if err := tra.Run(localDir, LOCALSRV, remoteDir, remoteServ); err != nil {
 		log.Fatal(err)
 	}
 }
 
 func usage() {
-	log.Printf("Usage: trago <remote-address>:<remote-dir> <local-dir>\n")
+	log.Printf("Usage: trago <user>@<hostname>:<remote-dir> <local-dir>\n")
 }
 
-func parseArgs() (string, string, string) {
-	var remoteAddr, remoteDir, clientDir string
+func parseArgs() (string, string, string, string) {
+	var hostname, remoteAddr, remoteDir, clientDir string
 
 	if len(flag.Args()) != 2 {
 		flag.Usage()
@@ -69,9 +69,16 @@ func parseArgs() (string, string, string) {
 		os.Exit(1)
 	}
 
+	host := strings.Split(remote[0], "@")
+	if len(host) != 2 {
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	hostname = strings.TrimSpace(host[1])
 	remoteAddr = strings.TrimSpace(remote[0])
 	remoteDir = strings.TrimSpace(remote[1])
 	clientDir = strings.TrimSpace(flag.Arg(1))
 
-	return remoteAddr, remoteDir, clientDir
+	return hostname, remoteAddr, remoteDir, clientDir
 }
