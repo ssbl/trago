@@ -4,13 +4,19 @@ Trago is a file synchronization utility inspired by
 [tra](https://swtch.com/tra/). It uses the synchronization algorithm
 defined in the [tra paper](http://publications.csail.mit.edu/tmp/MIT-CSAIL-TR-2005-014.pdf).
 
+You can install it using `go get` (assuming you have a Go environment set up):
+
+```bash
+go get github.com/ssbl/trago
+```
+
 ## Usage
 
 Simply point it to a remote directory and a local directory, and
 trago will carry out a bidirectional sync.
 
-```
-    $ trago user@host:directory-A directory-B
+```bash
+trago user@host:directory-A directory-B
 ```
 
 ## Caveats
